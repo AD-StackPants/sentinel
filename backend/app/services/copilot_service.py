@@ -207,3 +207,63 @@ class CopilotService:
                 "Open Tumaga Gym & City Coliseum"
             ]
         }
+
+    def save_chat_message(self, session_id: str, role: str, content: str, metadata: dict = None) -> bool:
+        """Saves a user or assistant chat message to Snowflake chat_history table."""
+        if not self.conn:
+            return False
+        try:
+            import uuid
+            msg_id = str(uuid.uuid4())
+            meta_json = json.dumps(metadata or {})
+            cursor = self.conn.cursor()
+            sql = """
+                INSERT INTO SENTINEL_AI_DB.PUBLIC.chat_history
+                (id, session_id, role, content, metadata, created_at)
+                SELECT %s, %s, %s, %s, PARSE_JSON(%s), CURRENT_TIMESTAMP()
+            """
+            cursor.execute(sql, (msg_id, session_id, role, content, meta_json))
+            cursor.close()
+            return True
+        except Exception as e:
+            logger.error("failed_to_save_chat_message", session_id=session_id, error=str(e))
+            return False
+
+    def get_chat_history(self, session_id: str = "default_session", limit: int = 50) -> list:
+        """Retrieves chat message transcript from Snowflake chat_history table."""
+        if not self.conn:
+            return []
+        try:
+            cursor = self.conn.cursor()
+            sql = """
+                SELECT id, role, content, metadata, created_at
+                FROM SENTINEL_AI_DB.PUBLIC.chat_history
+                WHERE session_id = %s
+                ORDER BY created_at ASC
+                LIMIT %s
+            """
+            cursor.execute(sql, (session_id, limit))
+            rows = cursor.fetchall()
+            cursor.close()
+            history = []
+            for r in rows:
+                msg_id, role, content, meta_val, created_at = r
+                meta = {}
+                if meta_val:
+                    try:
+                        meta = json.loads(meta_val) if isinstance(meta_val, str) else meta_val
+                    except Exception:
+                        pass
+                history.append({
+                    "id": msg_id,
+                    "sender": "user" if role == "user" else "assistant",
+                    "text": content,
+                    "response": content,
+                    "explanation": meta.get("explanation"),
+                    "recommended_actions": meta.get("recommended_actions"),
+                    "timestamp": str(created_at) if created_at else None
+                })
+            return history
+        except Exception as e:
+            logger.error("failed_to_fetch_chat_history", session_id=session_id, error=str(e))
+            return []

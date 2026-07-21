@@ -71,3 +71,15 @@ SELECT
 FROM execution_jobs
 ORDER BY created_at DESC
 LIMIT 10;
+
+-- 8. Copilot Chat Session History Records
+SELECT 
+    id,
+    session_id,
+    role,
+    content,
+    metadata,
+    created_at
+FROM chat_history
+ORDER BY created_at ASC
+LIMIT 50;

@@ -84,3 +84,13 @@ CREATE OR REPLACE TABLE execution_tasks (
     created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
+
+-- Chat Interface conversation history table
+CREATE OR REPLACE TABLE chat_history (
+    id STRING PRIMARY KEY,
+    session_id STRING,
+    role STRING,
+    content STRING,
+    metadata VARIANT,
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);

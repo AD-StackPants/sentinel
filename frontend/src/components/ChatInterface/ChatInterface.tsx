@@ -29,6 +29,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/v1/copilot/history?session_id=default_session`);
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          const loadedMsgs = res.data.map((item: any) => {
+            let fullText = item.text || item.response || '';
+            if (item.explanation) {
+              fullText += `\n\n**Reasoning**: ${item.explanation}`;
+            }
+            return {
+              role: item.sender === 'user' ? 'user' : 'ai',
+              text: fullText,
+              recommendations: item.recommended_actions || undefined
+            };
+          });
+          setMessages(loadedMsgs);
+        }
+      } catch (err) {
+        console.error("Failed to load chat history from Snowflake", err);
+      }
+    };
+    fetchHistory();
+  }, []);
+
   const sendQuery = async (queryText: string) => {
     if (!queryText.trim()) return;
 
