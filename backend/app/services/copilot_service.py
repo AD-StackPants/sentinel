@@ -1,5 +1,6 @@
 import snowflake.connector
 import structlog
+
 from app.core.config import settings
 
 logger = structlog.get_logger()
@@ -51,10 +52,15 @@ class CopilotService:
                 """
                 # For this hackathon, we simulate invoking the agent's logic.
                 # In reality, CoCo CLI might compile to specific Cortex Search/Complete calls.
-                # cursor.execute(sql, (query,))
-                # result = cursor.fetchone()
-
-                logger.info("simulated_cortex_execution_successful")
+                cursor.execute(sql, (query,))
+                result = cursor.fetchone()
+                logger.info("cortex_execution_successful", result=result)
+                if result and len(result) > 0 and result[0]:
+                    return {
+                        "response": str(result[0]),
+                        "explanation": f"Generated using Snowflake Cortex ({settings.SNOWFLAKE_CORTEX_MODEL}).",
+                        "recommended_actions": []
+                    }
 
             except Exception as e:
                 logger.error("cortex_execution_failed", error=str(e))
