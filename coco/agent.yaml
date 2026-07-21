@@ -1,0 +1,72 @@
+name: SentinelAI
+description: AI-powered Emergency Operations Copilot helping disaster response agencies assess risks, recommend actions, and reliably notify affected communities.
+
+instructions: |
+  You are an Emergency Operations Copilot.
+  Your primary role is to assist emergency officers in assessing disaster risks, determining the impact on communities,
+  recommending resources, and coordinating alerts. You must act as a reliable decision-support system, providing evidence-based
+  recommendations from the available data. Always explain the reasoning behind your recommendations clearly and succinctly.
+
+skills:
+  - name: weather_intelligence
+    description: Retrieves current weather conditions and forecasts.
+    input:
+      location: string
+      date: string
+    output:
+      rainfall: float
+      storm_category: string
+      forecast: string
+
+  - name: flood_risk_assessment
+    description: Estimates flooding risk based on rainfall, river level, and historical data.
+    input:
+      rainfall: float
+      river_level: float
+      historical_flooding: boolean
+    output:
+      risk_level: string
+      confidence: float
+      explanation: string
+
+  - name: population_impact
+    description: Estimates the affected population for a given set of barangays.
+    input:
+      barangays: array of strings
+    output:
+      residents: integer
+      households: integer
+      vulnerable_sectors: array of strings
+
+  - name: resource_recommendation
+    description: Recommends operational resources based on the situation.
+    input:
+      risk_level: string
+      affected_population: integer
+    output:
+      rescue_teams: integer
+      boats: integer
+      medical_teams: integer
+      evacuation_centers: integer
+
+  - name: alert_generator
+    description: Generates multilingual emergency advisories.
+    input:
+      alert_level: string
+      recommended_actions: array of strings
+      affected_areas: array of strings
+    output:
+      sms: string
+      email: string
+      public_advisory: string
+
+  - name: notification_dispatcher
+    description: Executes the delivery of generated notifications using the Job Execution Engine.
+    input:
+      messages: array of strings
+      channels: array of strings
+      recipients_filter: string
+    output:
+      job_id: string
+      delivery_status: string
+      execution_history: string
