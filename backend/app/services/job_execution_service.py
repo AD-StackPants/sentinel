@@ -177,7 +177,7 @@ class JobExecutionService:
                     sql = """
                         INSERT INTO SENTINEL_AI_DB.PUBLIC.execution_jobs
                         (job_id, status, messages, channels, recipients_filter, logs, counts)
-                        VALUES (%s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s))
+                        SELECT %s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s)
                     """
                     cursor.execute(sql, (
                         job_id, job["status"], messages_json, channels_json,
