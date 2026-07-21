@@ -33,27 +33,38 @@ const DisasterMap: React.FC = () => {
 
   // Update geoData when new sensor telemetry arrives
   useEffect(() => {
-    if (telemetry && telemetry.type === 'sensor_update' && geoData) {
-      const updatedFeatures = geoData.features.map((feature: any) => {
-        if (feature.properties.type === 'sensor') {
-          const update = telemetry.data.find((d: any) => d.name === feature.properties.name);
+    if (!telemetry || telemetry.type !== 'sensor_update') return;
+
+    setGeoData((prevGeoData: any) => {
+      if (!prevGeoData || !prevGeoData.features) return prevGeoData;
+
+      let hasChanges = false;
+      const updatedFeatures = prevGeoData.features.map((feature: any) => {
+        if (feature.properties?.type === 'sensor') {
+          const update = telemetry.data?.find((d: any) => d.name === feature.properties.name);
           if (update) {
-            return {
-              ...feature,
-              properties: {
-                ...feature.properties,
-                level: `${update.level.toFixed(1)}m`,
-                status: update.level >= 8.0 ? 'Critical' : 'Normal'
-              }
-            };
+            const newLevel = `${update.level.toFixed(1)}m`;
+            const newStatus = update.level >= 8.0 ? 'Critical' : 'Normal';
+            if (feature.properties.level !== newLevel || feature.properties.status !== newStatus) {
+              hasChanges = true;
+              return {
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  level: newLevel,
+                  status: newStatus
+                }
+              };
+            }
           }
         }
         return feature;
       });
 
-      setGeoData({ ...geoData, features: updatedFeatures });
-    }
-  }, [telemetry, geoData]);
+      if (!hasChanges) return prevGeoData;
+      return { ...prevGeoData, features: updatedFeatures };
+    });
+  }, [telemetry]);
 
   return (
     <div className="card h-full w-full relative overflow-hidden border-border bg-card shadow-sm">
@@ -123,8 +134,9 @@ const DisasterMap: React.FC = () => {
             {showFloodZones && (
               <Layer
                 id="flood-zones"
+                source="disaster-data"
                 type="fill"
-                filter={['==', 'type', 'risk_zone']}
+                filter={['==', ['get', 'type'], 'risk_zone']}
                 paint={{
                   'fill-color': '#ef4444',
                   'fill-opacity': 0.4
@@ -134,104 +146,110 @@ const DisasterMap: React.FC = () => {
 
             {/* Point Layer for Evacuation Centers */}
             {showEvacuation && (
-              <>
-                <Layer
-                  id="evacuation-centers"
-                  type="circle"
-                  filter={['==', 'type', 'evacuation_center']}
-                  paint={{
-                    'circle-radius': 8,
-                    'circle-color': '#22c55e',
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': '#ffffff'
-                  }}
-                />
-                <Layer
-                  id="evacuation-centers-labels"
-                  type="symbol"
-                  filter={['==', 'type', 'evacuation_center']}
-                  layout={{
-                    'text-field': ['get', 'name'],
-                    'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
-                    'text-radial-offset': 0.8,
-                    'text-justify': 'auto',
-                    'text-size': 11
-                  }}
-                  paint={{
-                    'text-color': '#0f172a',
-                    'text-halo-color': '#ffffff',
-                    'text-halo-width': 2
-                  }}
-                />
-              </>
+              <Layer
+                id="evacuation-centers"
+                source="disaster-data"
+                type="circle"
+                filter={['==', ['get', 'type'], 'evacuation_center']}
+                paint={{
+                  'circle-radius': 8,
+                  'circle-color': '#22c55e',
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#ffffff'
+                }}
+              />
+            )}
+            {showEvacuation && (
+              <Layer
+                id="evacuation-centers-labels"
+                source="disaster-data"
+                type="symbol"
+                filter={['==', ['get', 'type'], 'evacuation_center']}
+                layout={{
+                  'text-field': ['get', 'name'],
+                  'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                  'text-radial-offset': 0.8,
+                  'text-justify': 'auto',
+                  'text-size': 11
+                }}
+                paint={{
+                  'text-color': '#0f172a',
+                  'text-halo-color': '#ffffff',
+                  'text-halo-width': 2
+                }}
+              />
             )}
 
             {/* Point Layer for Hospitals */}
             {showHospitals && (
-              <>
-                <Layer
-                  id="hospitals"
-                  type="circle"
-                  filter={['==', 'type', 'hospital']}
-                  paint={{
-                    'circle-radius': 8,
-                    'circle-color': '#3b82f6',
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': '#ffffff'
-                  }}
-                />
-                <Layer
-                  id="hospitals-labels"
-                  type="symbol"
-                  filter={['==', 'type', 'hospital']}
-                  layout={{
-                    'text-field': ['get', 'name'],
-                    'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
-                    'text-radial-offset': 0.8,
-                    'text-justify': 'auto',
-                    'text-size': 11
-                  }}
-                  paint={{
-                    'text-color': '#0f172a',
-                    'text-halo-color': '#ffffff',
-                    'text-halo-width': 2
-                  }}
-                />
-              </>
+              <Layer
+                id="hospitals"
+                source="disaster-data"
+                type="circle"
+                filter={['==', ['get', 'type'], 'hospital']}
+                paint={{
+                  'circle-radius': 8,
+                  'circle-color': '#3b82f6',
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#ffffff'
+                }}
+              />
+            )}
+            {showHospitals && (
+              <Layer
+                id="hospitals-labels"
+                source="disaster-data"
+                type="symbol"
+                filter={['==', ['get', 'type'], 'hospital']}
+                layout={{
+                  'text-field': ['get', 'name'],
+                  'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                  'text-radial-offset': 0.8,
+                  'text-justify': 'auto',
+                  'text-size': 11
+                }}
+                paint={{
+                  'text-color': '#0f172a',
+                  'text-halo-color': '#ffffff',
+                  'text-halo-width': 2
+                }}
+              />
             )}
 
             {/* Point Layer for Sensors */}
             {showSensors && (
-              <>
-                <Layer
-                  id="sensors"
-                  type="circle"
-                  filter={['==', 'type', 'sensor']}
-                  paint={{
-                    'circle-radius': 6,
-                    'circle-color': '#eab308',
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': '#ffffff'
-                  }}
-                />
-                <Layer
-                  id="sensors-labels"
-                  type="symbol"
-                  filter={['==', 'type', 'sensor']}
-                  layout={{
-                    'text-field': ['concat', ['get', 'name'], '\n', ['get', 'level']],
-                    'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
-                    'text-radial-offset': 0.8,
-                    'text-justify': 'auto',
-                    'text-size': 10
-                  }}
-                  paint={{
-                    'text-color': '#0f172a',
-                    'text-halo-color': '#ffffff',
-                    'text-halo-width': 2
-                  }}
-                />
-              </>
+              <Layer
+                id="sensors"
+                source="disaster-data"
+                type="circle"
+                filter={['==', ['get', 'type'], 'sensor']}
+                paint={{
+                  'circle-radius': 6,
+                  'circle-color': '#eab308',
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#ffffff'
+                }}
+              />
+            )}
+            {showSensors && (
+              <Layer
+                id="sensors-labels"
+                source="disaster-data"
+                type="symbol"
+                filter={['==', ['get', 'type'], 'sensor']}
+                layout={{
+                  'text-field': ['concat', ['get', 'name'], '\n', ['get', 'level']],
+                  'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                  'text-radial-offset': 0.8,
+                  'text-justify': 'auto',
+                  'text-size': 10
+                }}
+                paint={{
+                  'text-color': '#0f172a',
+                  'text-halo-color': '#ffffff',
+                  'text-halo-width': 2
+                }}
+              />
             )}
           </Source>
         )}

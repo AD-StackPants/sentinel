@@ -7,6 +7,31 @@ from app.core.config import settings
 logger = structlog.get_logger()
 router = APIRouter()
 
+import math
+
+def _generate_dynamic_risk_polygon(points, buffer=0.012):
+    if not points:
+        return []
+    avg_lon = sum(p[0] for p in points) / len(points)
+    avg_lat = sum(p[1] for p in points) / len(points)
+
+    outer_points = []
+    for lon, lat in points:
+        for angle_deg in range(0, 360, 45):
+            rad = math.radians(angle_deg)
+            outer_points.append((lon + buffer * math.cos(rad), lat + buffer * math.sin(rad)))
+
+    sorted_pts = sorted(outer_points, key=lambda p: math.atan2(p[1] - avg_lat, p[0] - avg_lon))
+
+    unique_pts = []
+    for p in sorted_pts:
+        if not unique_pts or (abs(p[0] - unique_pts[-1][0]) > 0.003 or abs(p[1] - unique_pts[-1][1]) > 0.003):
+            unique_pts.append([round(p[0], 5), round(p[1], 5)])
+
+    if unique_pts:
+        unique_pts.append(unique_pts[0])
+    return [unique_pts]
+
 def _fetch_snowflake_map_features():
     if settings.SNOWFLAKE_ACCOUNT == "placeholder_account":
         return None
@@ -24,7 +49,7 @@ def _fetch_snowflake_map_features():
         cursor = conn.cursor()
         features = []
 
-        # 1. Fetch Risk Zone polygon (from high-risk river sensors / barangays)
+        # 1. Fetch Dynamic Risk Zone Polygons based on live high-risk sensors & barangay GPS locations
         cursor.execute("""
             SELECT b.barangay, b.latitude, b.longitude, r.water_level
             FROM barangays b
@@ -33,29 +58,41 @@ def _fetch_snowflake_map_features():
         """)
         high_risk_rows = cursor.fetchall()
         if high_risk_rows:
-            # Build bounding risk zone polygon coordinates around high risk barangays
-            lats = [r[1] for r in high_risk_rows]
-            lons = [r[2] for r in high_risk_rows]
-            min_lat, max_lat = min(lats) - 0.015, max(lats) + 0.015
-            min_lon, max_lon = min(lons) - 0.015, max(lons) + 0.015
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "type": "risk_zone",
-                    "name": "Tumaga River High-Risk Flood Zone",
-                    "risk_level": "High"
-                },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [min_lon, max_lat],
-                        [max_lon, max_lat],
-                        [max_lon, min_lat],
-                        [min_lon, min_lat],
-                        [min_lon, max_lat]
-                    ]]
-                }
-            })
+            # Cluster by proximity (main city cluster vs outer barangays)
+            main_cluster_pts = [(float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) < 7.0]
+            outer_cluster_pts = [(float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) >= 7.0]
+
+            if main_cluster_pts:
+                poly_coords = _generate_dynamic_risk_polygon(main_cluster_pts, buffer=0.015)
+                if poly_coords and len(poly_coords[0]) >= 4:
+                    features.append({
+                        "type": "Feature",
+                        "properties": {
+                            "type": "risk_zone",
+                            "name": "Tumaga / Central River Basin Active Flood Zone",
+                            "risk_level": "High"
+                        },
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": poly_coords
+                        }
+                    })
+
+            if outer_cluster_pts:
+                poly_coords_outer = _generate_dynamic_risk_polygon(outer_cluster_pts, buffer=0.012)
+                if poly_coords_outer and len(poly_coords_outer[0]) >= 4:
+                    features.append({
+                        "type": "Feature",
+                        "properties": {
+                            "type": "risk_zone",
+                            "name": "North Zamboanga River Spillway Risk Zone",
+                            "risk_level": "High"
+                        },
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": poly_coords_outer
+                        }
+                    })
 
         # 2. Fetch Evacuation Centers joined with barangay coordinates
         cursor.execute("""
