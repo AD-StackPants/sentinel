@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.services.copilot_service import CopilotService
+from app.services.audit_service import audit_service
 
 router = APIRouter()
 

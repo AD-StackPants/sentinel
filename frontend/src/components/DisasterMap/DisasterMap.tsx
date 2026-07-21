@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import Map, { Source, Layer } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, Popup } from 'react-map-gl/maplibre';
 import axios from 'axios';
+import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useTelemetryWebSocket } from '../../hooks/useTelemetryWebSocket';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const DEFAULT_LNG = parseFloat(import.meta.env.VITE_DEFAULT_MAP_LONGITUDE) || 122.0790;
@@ -14,6 +16,8 @@ const DisasterMap: React.FC = () => {
   const [showEvacuation, setShowEvacuation] = useState<boolean>(true);
   const [showHospitals, setShowHospitals] = useState<boolean>(true);
   const [showSensors, setShowSensors] = useState<boolean>(true);
+  const [selectedFeature, setSelectedFeature] = useState<any>(null);
+  const { telemetry } = useTelemetryWebSocket();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,14 +31,46 @@ const DisasterMap: React.FC = () => {
     fetchData();
   }, []);
 
+  // Update geoData when new sensor telemetry arrives
+  useEffect(() => {
+    if (telemetry && telemetry.type === 'sensor_update' && geoData) {
+      const updatedFeatures = geoData.features.map((feature: any) => {
+        if (feature.properties.type === 'sensor') {
+          const update = telemetry.data.find((d: any) => d.name === feature.properties.name);
+          if (update) {
+            return {
+              ...feature,
+              properties: {
+                ...feature.properties,
+                level: `${update.level.toFixed(1)}m`,
+                status: update.level >= 8.0 ? 'Critical' : 'Normal'
+              }
+            };
+          }
+        }
+        return feature;
+      });
+
+      setGeoData({ ...geoData, features: updatedFeatures });
+    }
+  }, [telemetry, geoData]);
+
   return (
     <div className="card h-full w-full relative overflow-hidden border-border bg-card shadow-sm">
       {/* Top Banner: Live Telemetry Status Overlay */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-card/90 glass-panel border border-border px-3 py-1.5 rounded-xl shadow-md text-xs">
-        <span className="w-2.5 h-2.5 rounded-full bg-danger animate-pulse"></span>
-        <span className="font-semibold text-foreground">SENSOR ZAM-TUMAGA-01:</span>
-        <span className="font-mono text-danger font-bold">8.8m WATER LEVEL (CRITICAL)</span>
-      </div>
+      {(() => {
+        const tumagaSensor = geoData?.features?.find((f: any) => f.properties.type === 'sensor' && f.properties.name === 'ZAM-TUMAGA-01');
+        const level = tumagaSensor ? tumagaSensor.properties.level : '8.8m';
+        const isCritical = level && parseFloat(level) >= 8.0;
+
+        return (
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-card/90 glass-panel border border-border px-3 py-1.5 rounded-xl shadow-md text-xs">
+            <span className={`w-2.5 h-2.5 rounded-full ${isCritical ? 'bg-danger animate-pulse' : 'bg-success'}`}></span>
+            <span className="font-semibold text-foreground">SENSOR ZAM-TUMAGA-01:</span>
+            <span className={`font-mono font-bold ${isCritical ? 'text-danger' : 'text-success'}`}>{level} WATER LEVEL {isCritical ? '(CRITICAL)' : '(NORMAL)'}</span>
+          </div>
+        );
+      })()}
 
       {/* Layer Control Bar */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-card/90 glass-panel border border-border p-1.5 rounded-xl shadow-md text-[11px] font-medium text-foreground">
@@ -71,6 +107,15 @@ const DisasterMap: React.FC = () => {
           zoom: DEFAULT_ZOOM
         }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+        interactiveLayerIds={['evacuation-centers', 'hospitals', 'sensors']}
+        onClick={(e) => {
+          if (e.features && e.features.length > 0) {
+            setSelectedFeature(e.features[0]);
+          } else {
+            setSelectedFeature(null);
+          }
+        }}
+        cursor="pointer"
       >
         {geoData && (
           <Source id="disaster-data" type="geojson" data={geoData}>
@@ -189,6 +234,91 @@ const DisasterMap: React.FC = () => {
               </>
             )}
           </Source>
+        )}
+
+        {selectedFeature && selectedFeature.properties.type === 'evacuation_center' && (
+          <Popup
+            longitude={selectedFeature.geometry.coordinates[0]}
+            latitude={selectedFeature.geometry.coordinates[1]}
+            anchor="bottom"
+            onClose={() => setSelectedFeature(null)}
+            className="z-50"
+            closeButton={false}
+          >
+            <div className="bg-card/90 glass-panel p-3 rounded-xl shadow-lg border border-border text-foreground min-w-[200px]">
+              <h4 className="font-bold text-sm mb-1">{selectedFeature.properties.name}</h4>
+              <p className="text-xs mb-2 text-neutral-foreground">Evacuation Center</p>
+
+              <div className="w-full bg-neutral/20 rounded-full h-2 mb-1">
+                <div
+                  className="bg-success h-2 rounded-full"
+                  style={{ width: `${(selectedFeature.properties.occupancy / selectedFeature.properties.capacity) * 100}%` }}
+                ></div>
+              </div>
+              <p className="text-xs font-mono">
+                {selectedFeature.properties.occupancy} / {selectedFeature.properties.capacity}
+                ({Math.round((selectedFeature.properties.occupancy / selectedFeature.properties.capacity) * 100)}%)
+              </p>
+            </div>
+          </Popup>
+        )}
+
+        {selectedFeature && selectedFeature.properties.type === 'hospital' && (
+          <Popup
+            longitude={selectedFeature.geometry.coordinates[0]}
+            latitude={selectedFeature.geometry.coordinates[1]}
+            anchor="bottom"
+            onClose={() => setSelectedFeature(null)}
+            className="z-50"
+            closeButton={false}
+          >
+            <div className="bg-card/90 glass-panel p-3 rounded-xl shadow-lg border border-border text-foreground min-w-[200px]">
+              <h4 className="font-bold text-sm mb-1">{selectedFeature.properties.name}</h4>
+              <p className="text-xs mb-2 text-neutral-foreground">Medical Facility</p>
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-bold text-lg">{selectedFeature.properties.beds}</span>
+                <span className="text-xs text-neutral-foreground">beds available</span>
+              </div>
+            </div>
+          </Popup>
+        )}
+
+        {selectedFeature && selectedFeature.properties.type === 'sensor' && (
+          <Popup
+            longitude={selectedFeature.geometry.coordinates[0]}
+            latitude={selectedFeature.geometry.coordinates[1]}
+            anchor="bottom"
+            onClose={() => setSelectedFeature(null)}
+            className="z-50"
+            closeButton={false}
+          >
+            <div className="bg-card/90 glass-panel p-3 rounded-xl shadow-lg border border-border text-foreground min-w-[220px]">
+              <h4 className="font-bold text-sm mb-1">{selectedFeature.properties.name}</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-2 h-2 rounded-full ${selectedFeature.properties.status === 'Critical' ? 'bg-danger animate-pulse' : 'bg-warning'}`}></span>
+                <span className="text-xs font-bold font-mono">{selectedFeature.properties.level}</span>
+                <span className="text-xs text-neutral-foreground uppercase">{selectedFeature.properties.status}</span>
+              </div>
+
+              <div className="h-16 w-full mt-2 border border-border/50 rounded bg-background/50">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[
+                    { time: '00', level: 4.2 },
+                    { time: '04', level: 4.8 },
+                    { time: '08', level: 5.5 },
+                    { time: '12', level: 6.8 },
+                    { time: '16', level: 7.9 },
+                    { time: '20', level: 8.4 },
+                    { time: '24', level: 8.8 }
+                  ]}>
+                    <YAxis domain={['auto', 'auto']} hide />
+                    <Line type="monotone" dataKey="level" stroke="#eab308" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-[10px] text-center text-neutral-foreground mt-1">24h Water Level Trend</p>
+            </div>
+          </Popup>
         )}
       </Map>
 

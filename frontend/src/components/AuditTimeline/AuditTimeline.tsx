@@ -11,6 +11,16 @@ interface AuditTimelineProps {
 }
 
 const AuditTimeline: React.FC<AuditTimelineProps> = ({ events }) => {
+    const handleExport = () => {
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+            JSON.stringify(events, null, 2)
+        )}`;
+        const link = document.createElement('a');
+        link.href = jsonString;
+        link.download = `incident-report-${new Date().toISOString()}.json`;
+        link.click();
+    };
+
     return (
         <div className="card h-full flex flex-col p-3 gap-2 overflow-hidden border-border bg-card shadow-xs">
             {/* Subtle Compact Card Header */}
@@ -19,7 +29,16 @@ const AuditTimeline: React.FC<AuditTimelineProps> = ({ events }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
                     <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Audit Log</span>
                 </div>
-                <span className="text-[10px] font-mono text-neutral-foreground">{events.length} EVENTS</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleExport}
+                        className="text-[10px] font-mono bg-primary/20 text-primary hover:bg-primary/30 px-1.5 py-0.5 rounded border border-primary/30 transition-colors"
+                        title="Export Incident Report"
+                    >
+                        📥 Export
+                    </button>
+                    <span className="text-[10px] font-mono text-neutral-foreground">{events.length} EVENTS</span>
+                </div>
             </div>
 
             <div className="card-content flex-1 overflow-y-auto pr-1">
