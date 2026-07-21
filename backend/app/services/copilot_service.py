@@ -72,30 +72,44 @@ class CopilotService:
         return self._fallback_mock_response(query)
 
     def _fallback_mock_response(self, query: str) -> dict:
-        """Provides a realistic mock response for the Northern Mindanao scenario."""
+        """Provides a realistic mock response for the Zamboanga City scenario."""
         query_lower = query.lower()
 
         if "flood risk" in query_lower or "greatest" in query_lower:
             return {
-                "response": "Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in Northern Mindanao (specifically Cagayan de Oro) are Barangay Carmen, Barangay Macasandig, and Barangay Balulang.",
-                "explanation": "Rainfall in the upstream watershed has exceeded 150mm in the last 12 hours. The Cagayan de Oro River level is currently at 8.5 meters (Critical Level). Historical data indicates severe flooding in these barangays under similar conditions.",
-                "recommended_actions": ["Issue Orange Alert", "Prepare Evacuation Centers"]
+                "response": "Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in Zamboanga City are Barangay Tumaga, Barangay Sta. Maria, and Barangay Tetuan.",
+                "explanation": "Rainfall in the Zamboanga Peninsula has reached 175mm in the last 12 hours. Sensor ZAM-TUMAGA-01 on the Tumaga River reports a water level of 8.8m, which exceeds the Critical Threshold. The probability of severe flooding is high.",
+                "recommended_actions": ["Issue Orange Alert", "Deploy Rescue Teams", "Open Evacuation Centers"]
             }
         elif "what should we do" in query_lower or "recommend" in query_lower:
             return {
-                "response": "I recommend immediately upgrading to an Orange Alert for the affected barangays.",
-                "explanation": "The probability of localized flooding within the next 4 hours is 91%. Approximately 18,000 residents are in the high-risk zones.",
-                "recommended_actions": ["Deploy 6 rescue teams", "Open 2 evacuation centers (Macasandig Covered Court, City Central School)", "Dispatch 3 ambulances on standby"]
+                "response": "I strongly recommend immediately upgrading to an Orange Alert for Barangays Tumaga, Sta. Maria, and Tetuan. You should deploy resources and open evacuation centers immediately.",
+                "explanation": "With the Tumaga River at 8.8m, approximately 28,000 residents across Tumaga, Sta. Maria, and Tetuan are in high-risk zones. Immediate mobilization is required.",
+                "recommended_actions": ["Deploy 8 rescue teams", "Dispatch 4 ambulances", "Open Tumaga Gym & City Coliseum"]
             }
         elif "notify" in query_lower or "alert" in query_lower:
             return {
-                "response": "Understood. I have drafted multilingual alerts (English, Filipino, Cebuano) warning residents of Barangay Carmen, Macasandig, and Balulang to prepare for possible evacuation.",
-                "explanation": "Notifications will be routed through the Job Execution Engine for reliable delivery via SMS and Email.",
+                "response": "Understood. I have drafted multilingual alerts (English, Filipino, Chavacano) warning residents of Tumaga, Sta. Maria, and Tetuan to prepare for possible evacuation.",
+                "explanation": "Notifications will be routed through the Job Execution Engine for reliable delivery via SMS and Email to the estimated 28,000 affected population.",
                 "recommended_actions": ["Approve Notification Dispatch", "Monitor Delivery Dashboard"]
             }
         else:
             return {
-                "response": "I am monitoring the situation. Current weather feeds indicate a tropical depression approaching the eastern seaboard.",
-                "explanation": "No critical thresholds have been breached in your immediate jurisdiction yet.",
-                "recommended_actions": ["Continue Monitoring", "Review Resource Inventory"]
+                "response": "I am monitoring the situation. Current weather feeds indicate 'Typhoon Approaching' with 175mm rainfall recorded in the Zamboanga Peninsula.",
+                "explanation": "Tumaga River is currently at critical levels (8.8m). Please ask about flood risk or recommendations for detailed actions.",
+                "recommended_actions": ["Assess Flood Risk", "Review Resources"]
             }
+
+    def get_recommendations(self) -> dict:
+        """Provides the current active recommendation context for the EOC Dashboard."""
+        return {
+            "risk_level": "Orange Alert",
+            "confidence_score": 92,
+            "affected_population": 28000,
+            "affected_barangays": ["Tumaga", "Sta. Maria", "Tetuan"],
+            "recommended_actions": [
+                "Deploy 8 rescue teams",
+                "Dispatch 4 ambulances",
+                "Open Tumaga Gym & City Coliseum"
+            ]
+        }

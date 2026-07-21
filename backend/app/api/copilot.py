@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
 from app.services.copilot_service import CopilotService
 
 router = APIRouter()
@@ -25,3 +26,7 @@ def ask_copilot(query: CopilotQuery, service: CopilotService = Depends(get_copil
         explanation=result.get("explanation"),
         recommended_actions=result.get("recommended_actions")
     )
+
+@router.get("/recommendations")
+def get_recommendations(service: CopilotService = Depends(get_copilot_service)):
+    return service.get_recommendations()

@@ -1,10 +1,7 @@
-import structlog
-import uuid
-import smtplib
-from email.mime.text import MIMEText
-from twilio.rest import Client
-from app.core.config import settings
 import asyncio
+import uuid
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -13,60 +10,64 @@ class JobExecutionService:
         # In a real app, this would be backed by Redis/Celery or Snowflake tables
         self.jobs_db = {}
 
-    def create_job(self, messages: list[str], channels: list[str], recipients_filter: str) -> str:
+    async def create_job(self, messages: list[str], channels: list[str], recipients_filter: str) -> str:
         job_id = str(uuid.uuid4())
         self.jobs_db[job_id] = {
             "status": "queued",
             "messages": messages,
             "channels": channels,
             "recipients_filter": recipients_filter,
-            "logs": []
+            "logs": [],
+            "counts": {"sms": 0, "email": 0}
         }
 
         logger.info("job_created", job_id=job_id, channels=channels, filter=recipients_filter)
 
-        # Start background processing (simulation)
-        # In FastAPI, you would typically use BackgroundTasks, but for this mock we'll use asyncio.create_task
-        # Note: If running synchronously, this should be done properly via dependency injection or a task queue.
-        # For the hackathon, we will just simulate setting it to processing.
+        # Start background processing for the mock
+        asyncio.create_task(self.process_job_mock(job_id))
 
         return job_id
 
-    def process_job_mock(self, job_id: str):
-        """Simulates processing a job and updates the DB."""
+    async def process_job_mock(self, job_id: str):
+        """Simulates processing a job over time and updates the DB."""
         if job_id not in self.jobs_db:
             return
 
         self.jobs_db[job_id]["status"] = "processing"
         logger.info("job_processing_started", job_id=job_id)
 
-        # SIMULATE SENDING
         job = self.jobs_db[job_id]
+
+        # Simulate delay for processing
+        await asyncio.sleep(1)
 
         for channel in job["channels"]:
             if channel == "sms":
                 self._dispatch_sms(job["messages"], job["recipients_filter"])
-                job["logs"].append("Dispatched 500 SMS messages.")
+                job["logs"].append(f"[SMS] Attempting to deliver 1,200 messages to {job['recipients_filter']}...")
+                await asyncio.sleep(1.5)
+                job["counts"]["sms"] = 1200
+                job["logs"].append("[SMS] Successfully dispatched 1,200 SMS messages.")
             elif channel == "email":
                 self._dispatch_email(job["messages"], job["recipients_filter"])
-                job["logs"].append("Dispatched 1200 Email messages.")
+                job["logs"].append(f"[Email] Attempting to deliver 3,500 messages to {job['recipients_filter']}...")
+                await asyncio.sleep(1.5)
+                job["counts"]["email"] = 3500
+                job["logs"].append("[Email] Successfully dispatched 3,500 Email messages.")
 
+        await asyncio.sleep(0.5)
         self.jobs_db[job_id]["status"] = "completed"
         logger.info("job_completed", job_id=job_id)
 
     def get_job_status(self, job_id: str) -> dict:
         if job_id not in self.jobs_db:
-            return {"job_id": job_id, "status": "not_found", "logs": []}
-
-        # For demo purposes: If we ask for the status of a queued job, let's process it instantly
-        # so the UI updates quickly.
-        if self.jobs_db[job_id]["status"] == "queued":
-            self.process_job_mock(job_id)
+            return {"job_id": job_id, "status": "not_found", "logs": [], "counts": {}}
 
         return {
             "job_id": job_id,
             "status": self.jobs_db[job_id]["status"],
-            "logs": self.jobs_db[job_id]["logs"]
+            "logs": self.jobs_db[job_id]["logs"],
+            "counts": self.jobs_db[job_id].get("counts", {})
         }
 
     def _dispatch_sms(self, messages: list[str], recipients_filter: str):

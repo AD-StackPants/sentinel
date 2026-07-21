@@ -3,7 +3,12 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+    onApproveAction?: (action: string) => void;
+    onAiQuery?: () => void;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuery }) => {
   const [messages, setMessages] = useState<{role: string, text: string, recommendations?: string[]}[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +24,8 @@ const ChatInterface: React.FC = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    if (onAiQuery) onAiQuery();
 
     const userMsg = input;
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
@@ -81,7 +88,15 @@ const ChatInterface: React.FC = () => {
     } else {
         setMessages(prev => [...prev, { role: 'system', text: `Action logged: ${action}` }]);
     }
-  }
+  };
+
+  const handleLocalApprove = async (action: string) => {
+    setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}` }]);
+    if (onApproveAction) {
+        onApproveAction(action);
+    }
+    await handleApproveAction(action);
+  };
 
   return (
     <div className="flex flex-col h-full border rounded shadow-sm bg-white">
@@ -105,7 +120,7 @@ const ChatInterface: React.FC = () => {
                         {msg.recommendations.map((rec, i) => (
                             <button
                                 key={i}
-                                onClick={() => handleApproveAction(rec)}
+                                onClick={() => handleLocalApprove(rec)}
                                 className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
                             >
                                 {rec}
