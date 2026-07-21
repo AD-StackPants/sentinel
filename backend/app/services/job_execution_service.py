@@ -169,7 +169,7 @@ class JobExecutionService:
                 if exists:
                     sql = """
                         UPDATE SENTINEL_AI_DB.PUBLIC.execution_jobs
-                        SET status = %s, logs = %s, counts = %s
+                        SET status = %s, logs = PARSE_JSON(%s), counts = PARSE_JSON(%s), updated_at = CURRENT_TIMESTAMP()
                         WHERE job_id = %s
                     """
                     cursor.execute(sql, (job["status"], logs_json, counts_json, job_id))
@@ -177,7 +177,7 @@ class JobExecutionService:
                     sql = """
                         INSERT INTO SENTINEL_AI_DB.PUBLIC.execution_jobs
                         (job_id, status, messages, channels, recipients_filter, logs, counts)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s))
                     """
                     cursor.execute(sql, (
                         job_id, job["status"], messages_json, channels_json,
