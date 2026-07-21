@@ -5,11 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "celery>=5.3.6",
     "fastapi[standard]>=0.139.2",
     "httpx>=0.28.1",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "pytest>=9.1.1",
+    "redis>=5.0.1",
     "snowflake-connector-python>=4.7.1",
     "structlog>=26.1.0",
     "twilio>=9.10.9",

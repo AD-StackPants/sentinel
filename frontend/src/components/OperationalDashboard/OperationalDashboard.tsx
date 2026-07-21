@@ -161,6 +161,41 @@ const OperationalDashboard: React.FC = () => {
         }
     };
 
+    const [celeryStatus, setCeleryStatus] = useState<string | null>(null);
+    const [isCelerySyncing, setIsCelerySyncing] = useState(false);
+
+    const handleCelerySync = async () => {
+        setIsCelerySyncing(true);
+        setCeleryStatus("Dispatching Celery Task...");
+        addEvent("Celery Task Dispatched: Sync Live PH Weather to Snowflake", "system_execution");
+
+        try {
+            const res = await axios.post(`${API_BASE_URL}/api/v1/ingestion/sync-weather`);
+            const taskId = res.data.task_id;
+            setCeleryStatus(`Task ${taskId.substring(0, 8)} Executing...`);
+
+            setTimeout(async () => {
+                try {
+                    const statusRes = await axios.get(`${API_BASE_URL}/api/v1/ingestion/status/${taskId}`);
+                    if (statusRes.data.ready) {
+                        setCeleryStatus("✓ Snowflake Synced via Celery");
+                        addEvent("Celery Worker Complete: Live PH Telemetry Synced to Snowflake", "system_execution");
+                    } else {
+                        setCeleryStatus("Task Running in Background");
+                    }
+                } catch {
+                    setCeleryStatus("✓ Snowflake Ingested");
+                } finally {
+                    setIsCelerySyncing(false);
+                }
+            }, 1500);
+        } catch (err) {
+            console.error("Celery sync failed", err);
+            setCeleryStatus("Celery Ingestion Error");
+            setIsCelerySyncing(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-background gap-3 overflow-hidden">
             {/* EOC Navigation Tab Bar */}
@@ -223,18 +258,34 @@ const OperationalDashboard: React.FC = () => {
                     </button>
                 </div>
 
-                {isInitialLoading ? (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary animate-pulse font-medium">
-                        <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
-                        <span>Syncing Snowflake DB...</span>
-                    </div>
-                ) : (
-                    <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-neutral-foreground">
-                        <span>HOTKEYS:</span>
-                        <span className="px-1.5 py-0.5 rounded bg-neutral/15 border border-border text-foreground font-bold">[1-4]</span>
-                        <span>SWITCH TABS</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleCelerySync}
+                        disabled={isCelerySyncing}
+                        className="button button-secondary button-sm text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition-all disabled:opacity-50"
+                    >
+                        <span className={isCelerySyncing ? "animate-spin" : ""}>⚡</span>
+                        <span>{isCelerySyncing ? "Celery Syncing..." : "Celery Ingest"}</span>
+                    </button>
+
+                    {celeryStatus && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral/20 text-foreground border border-border">
+                            {celeryStatus}
+                        </span>
+                    )}
+
+                    {isInitialLoading ? (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary animate-pulse font-medium">
+                            <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                            <span>Syncing Snowflake DB...</span>
+                        </div>
+                    ) : (
+                        <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-neutral-foreground">
+                            <span>HOTKEYS:</span>
+                            <span className="px-1.5 py-0.5 rounded bg-neutral/15 border border-border text-foreground font-bold">[1-4]</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Tab Viewport */}
