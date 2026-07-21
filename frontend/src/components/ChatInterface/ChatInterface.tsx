@@ -3,17 +3,36 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+export interface ChatMessage {
+  role: string;
+  text: string;
+  recommendations?: string[];
+}
+
 interface ChatInterfaceProps {
     onApproveAction?: (action: string) => void;
     onAiQuery?: () => void;
     approvedActions?: string[];
+    messages?: ChatMessage[];
+    onSendMessage?: (query: string) => void;
+    isLoading?: boolean;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuery, approvedActions = [] }) => {
-  const [messages, setMessages] = useState<{role: string, text: string, recommendations?: string[]}[]>([]);
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  onApproveAction,
+  onAiQuery,
+  approvedActions = [],
+  messages: externalMessages,
+  onSendMessage: externalSendMessage,
+  isLoading: externalIsLoading
+}) => {
+  const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [internalIsLoading, setInternalIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const messages = externalMessages !== undefined ? externalMessages : internalMessages;
+  const isLoading = externalIsLoading !== undefined ? externalIsLoading : internalIsLoading;
 
   const SUGGESTED_PROMPTS = [
     "What is the flood risk?",
@@ -30,6 +49,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
   }, [messages]);
 
   useEffect(() => {
+    if (externalMessages !== undefined) return;
+
     const fetchHistory = async () => {
       try {
         const res = await axios.get(`${API_BASE_URL}/api/v1/copilot/history?session_id=default_session`);
@@ -45,27 +66,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
               recommendations: item.recommended_actions || undefined
             };
           });
-          setMessages(loadedMsgs);
+          setInternalMessages(loadedMsgs);
         }
       } catch (err) {
         console.error("Failed to load chat history from Snowflake", err);
       }
     };
     fetchHistory();
-  }, []);
+  }, [externalMessages]);
 
   const sendQuery = async (queryText: string) => {
     if (!queryText.trim()) return;
 
+    if (externalSendMessage) {
+      externalSendMessage(queryText);
+      setInput('');
+      return;
+    }
+
     if (onAiQuery) onAiQuery();
 
-    setMessages(prev => [...prev, { role: 'user', text: queryText }]);
+    setInternalMessages(prev => [...prev, { role: 'user', text: queryText }]);
     setInput('');
-    setIsLoading(true);
+    setInternalIsLoading(true);
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/v1/copilot/ask`, {
-        query: queryText
+        query: queryText,
+        session_id: 'default_session'
       });
 
       const aiResponse = response.data;
@@ -75,7 +103,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
         fullText += `\n\n**Reasoning**: ${aiResponse.explanation}`;
       }
 
-      setMessages(prev => [...prev, {
+      setInternalMessages(prev => [...prev, {
         role: 'ai',
         text: fullText,
         recommendations: aiResponse.recommended_actions
@@ -83,9 +111,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
 
     } catch (error) {
         console.error("Error asking copilot", error);
-        setMessages(prev => [...prev, { role: 'error', text: 'Connection to Sentinel AI backend failed.' }]);
+        setInternalMessages(prev => [...prev, { role: 'error', text: 'Connection to Sentinel AI backend failed.' }]);
     } finally {
-        setIsLoading(false);
+        setInternalIsLoading(false);
     }
   };
 
@@ -94,7 +122,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
   };
 
   const handleLocalApprove = (action: string) => {
-    setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}. Dispatching job...` }]);
+    setInternalMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}. Dispatching job...` }]);
     if (onApproveAction) {
         onApproveAction(action);
     }

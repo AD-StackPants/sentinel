@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ChatInterface from '../ChatInterface/ChatInterface';
+import ChatInterface, { type ChatMessage } from '../ChatInterface/ChatInterface';
 import DisasterMap from '../DisasterMap/DisasterMap';
 import RecommendationPanel from '../RecommendationPanel/RecommendationPanel';
 import NotificationPanel from '../NotificationPanel/NotificationPanel';
@@ -13,6 +13,8 @@ type ViewMode = 'overview' | 'map' | 'copilot' | 'dispatch';
 const OperationalDashboard: React.FC = () => {
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [activeJobId, setActiveJobId] = useState<string | null>(null);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [isChatLoading, setIsChatLoading] = useState(false);
     const [approvedActions, setApprovedActions] = useState<string[]>(() => {
         try {
             const saved = localStorage.getItem('sentinel_approved_actions');
@@ -25,13 +27,14 @@ const OperationalDashboard: React.FC = () => {
         { timestamp: new Date(), event: 'System Initialized', type: 'system_execution' }
     ]);
 
-    // Fetch approved directives and audit events from backend Snowflake DB on mount
+    // Fetch approved directives, audit events, and chat history from Snowflake DB on mount
     useEffect(() => {
         const fetchInitialAuditData = async () => {
             try {
-                const [dirRes, evtRes] = await Promise.all([
+                const [dirRes, evtRes, chatRes] = await Promise.all([
                     axios.get(`${API_BASE_URL}/api/v1/audit/approved-directives`),
-                    axios.get(`${API_BASE_URL}/api/v1/audit/events`)
+                    axios.get(`${API_BASE_URL}/api/v1/audit/events`),
+                    axios.get(`${API_BASE_URL}/api/v1/copilot/history?session_id=default_session`)
                 ]);
                 if (dirRes.data?.approved_directives && Array.isArray(dirRes.data.approved_directives)) {
                     setApprovedActions(prev => {
@@ -48,12 +51,58 @@ const OperationalDashboard: React.FC = () => {
                     }));
                     setAuditEvents(dbEvents);
                 }
+                if (Array.isArray(chatRes.data) && chatRes.data.length > 0) {
+                    const loadedMsgs = chatRes.data.map((item: any) => {
+                        let fullText = item.text || item.response || '';
+                        if (item.explanation) {
+                            fullText += `\n\n**Reasoning**: ${item.explanation}`;
+                        }
+                        return {
+                            role: item.sender === 'user' ? 'user' : 'ai',
+                            text: fullText,
+                            recommendations: item.recommended_actions || undefined
+                        };
+                    });
+                    setChatMessages(loadedMsgs);
+                }
             } catch (err) {
-                console.error("Failed to load audit data from backend", err);
+                console.error("Failed to load initial operational data from backend", err);
             }
         };
         fetchInitialAuditData();
     }, []);
+
+    const handleSendChatMessage = async (queryText: string) => {
+        if (!queryText.trim()) return;
+
+        addEvent("AI Risk Assessment Requested", "ai_assessment");
+        setChatMessages(prev => [...prev, { role: 'user', text: queryText }]);
+        setIsChatLoading(true);
+
+        try {
+            const response = await axios.post(`${API_BASE_URL}/api/v1/copilot/ask`, {
+                query: queryText,
+                session_id: 'default_session'
+            });
+
+            const aiResponse = response.data;
+            let fullText = aiResponse.response;
+            if (aiResponse.explanation) {
+                fullText += `\n\n**Reasoning**: ${aiResponse.explanation}`;
+            }
+
+            setChatMessages(prev => [...prev, {
+                role: 'ai',
+                text: fullText,
+                recommendations: aiResponse.recommended_actions
+            }]);
+        } catch (error) {
+            console.error("Error asking copilot", error);
+            setChatMessages(prev => [...prev, { role: 'error', text: 'Connection to Sentinel AI backend failed.' }]);
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
 
     // Keyboard shortcuts (1: Overview, 2: Map, 3: Copilot, 4: Dispatch)
     useEffect(() => {
@@ -196,7 +245,14 @@ const OperationalDashboard: React.FC = () => {
                         {/* Bottom Row: Chat, Notifications, Audit */}
                         <div className="flex h-2/5 gap-3">
                             <div className="w-1/3 h-full">
-                                <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")} approvedActions={approvedActions} />
+                                <ChatInterface
+                                    messages={chatMessages}
+                                    onSendMessage={handleSendChatMessage}
+                                    isLoading={isChatLoading}
+                                    onApproveAction={handleApproveAction}
+                                    onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}
+                                    approvedActions={approvedActions}
+                                />
                             </div>
                             <div className="w-1/3 h-full">
                                 <NotificationPanel activeJobId={activeJobId} />
@@ -224,7 +280,14 @@ const OperationalDashboard: React.FC = () => {
                 {viewMode === 'copilot' && (
                     <div className="flex h-full gap-3 animate-in fade-in duration-200">
                         <div className="w-3/5 h-full">
-                            <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")} approvedActions={approvedActions} />
+                            <ChatInterface
+                                messages={chatMessages}
+                                onSendMessage={handleSendChatMessage}
+                                isLoading={isChatLoading}
+                                onApproveAction={handleApproveAction}
+                                onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}
+                                approvedActions={approvedActions}
+                            />
                         </div>
                         <div className="w-2/5 h-full">
                             <RecommendationPanel onApprove={handleApproveAction} approvedActions={approvedActions} />
