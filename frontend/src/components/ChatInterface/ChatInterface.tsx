@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<{role: string, text: string, recommendations?: string[]}[]>([]);
   const [input, setInput] = useState('');
@@ -24,7 +26,7 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/v1/copilot/ask', {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/copilot/ask`, {
         query: userMsg
       });
 
@@ -55,7 +57,7 @@ const ChatInterface: React.FC = () => {
 
          try {
              // Mock creating a job
-             const jobRes = await axios.post('http://localhost:8000/api/v1/jobs/', {
+             const jobRes = await axios.post(`${API_BASE_URL}/api/v1/jobs/`, {
                  messages: ["EMERGENCY: Proceed to evacuation centers immediately."],
                  channels: ["sms", "email"],
                  recipients_filter: "high_risk_zones"
@@ -66,7 +68,7 @@ const ChatInterface: React.FC = () => {
 
              // Quick poll for demo purposes
              setTimeout(async () => {
-                const statusRes = await axios.get(`http://localhost:8000/api/v1/jobs/${jobId}`);
+                const statusRes = await axios.get(`${API_BASE_URL}/api/v1/jobs/${jobId}`);
                 setMessages(prev => [...prev, {
                     role: 'system',
                     text: `Job Status: ${statusRes.data.status}.\nLogs:\n${statusRes.data.logs.join('\n')}`

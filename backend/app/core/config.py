@@ -1,6 +1,18 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
+    # Application / Server Configuration
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+    ]
+
     # Snowflake / CoCo CLI Configuration
     SNOWFLAKE_ACCOUNT: str = "placeholder_account"
     SNOWFLAKE_USER: str = "placeholder_user"
@@ -8,6 +20,8 @@ class Settings(BaseSettings):
     SNOWFLAKE_DATABASE: str = "SENTINEL_AI_DB"
     SNOWFLAKE_SCHEMA: str = "PUBLIC"
     SNOWFLAKE_WAREHOUSE: str = "COMPUTE_WH"
+    SNOWFLAKE_ROLE: str = "ACCOUNTADMIN"
+    SNOWFLAKE_CORTEX_MODEL: str = "llama3-8b"
 
     # Twilio Configuration
     TWILIO_ACCOUNT_SID: str = "placeholder_twilio_sid"
@@ -21,6 +35,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = "placeholder_smtp_password"
     SMTP_FROM_EMAIL: str = "alerts@sentinelai.demo"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
 
 settings = Settings()

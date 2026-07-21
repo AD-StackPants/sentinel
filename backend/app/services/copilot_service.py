@@ -21,7 +21,8 @@ class CopilotService:
                     account=settings.SNOWFLAKE_ACCOUNT,
                     warehouse=settings.SNOWFLAKE_WAREHOUSE,
                     database=settings.SNOWFLAKE_DATABASE,
-                    schema=settings.SNOWFLAKE_SCHEMA
+                    schema=settings.SNOWFLAKE_SCHEMA,
+                    role=settings.SNOWFLAKE_ROLE,
                 )
                 logger.info("connected_to_snowflake")
             else:
@@ -42,9 +43,9 @@ class CopilotService:
                 # Example of invoking a Cortex agent function (syntax varies based on exact CoCo setup)
                 # This assumes a UDF or Cortex function is exposed for the agent.
                 cursor = self.conn.cursor()
-                sql = """
+                sql = f"""
                     SELECT SNOWFLAKE.CORTEX.COMPLETE(
-                        'llama3-8b', -- Or the model backing the CoCo agent
+                        '{settings.SNOWFLAKE_CORTEX_MODEL}',
                         %s
                     )
                 """

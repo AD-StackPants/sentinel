@@ -3,13 +3,15 @@ import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import axios from 'axios';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const DisasterMap: React.FC = () => {
   const [geoData, setGeoData] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/v1/map/data');
+        const response = await axios.get(`${API_BASE_URL}/api/v1/map/data`);
         setGeoData(response.data);
       } catch (error) {
         console.error("Failed to load map data", error);
