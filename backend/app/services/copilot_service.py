@@ -1,9 +1,6 @@
 import snowflake.connector
 import structlog
-<<<<<<< HEAD
 
-=======
->>>>>>> 9116aee1a5fb63b990e02badb0f9c9e719baf572
 from app.core.config import settings
 
 logger = structlog.get_logger()

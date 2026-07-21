@@ -82,19 +82,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
                 }]);
              }, 1500);
 
-            } catch (e) {
-                console.error("Failed to execute job", e);
-            }
-        } else {
-            setMessages(prev => [...prev, { role: 'system', text: `Action logged: ${action}` }]);
-        }
+         } catch (e) {
+             console.error("Failed to execute job", e);
+         }
+    } else {
+        setMessages(prev => [...prev, { role: 'system', text: `Action logged: ${action}` }]);
+    }
+  };
 
-        const handleLocalApprove = async (action: string) => {
-            setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}` }]);
-            if (onApproveAction) {
-                onApproveAction(action);
-            }
-        }
+  const handleLocalApprove = async (action: string) => {
+    setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}` }]);
+    if (onApproveAction) {
+        onApproveAction(action);
+    }
+    await handleApproveAction(action);
+  };
 
   return (
     <div className="flex flex-col h-full border rounded shadow-sm bg-white">
