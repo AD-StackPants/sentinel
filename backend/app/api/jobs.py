@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
 from app.services.job_execution_service import JobExecutionService
 
 router = APIRouter()
@@ -21,8 +22,8 @@ class JobStatus(BaseModel):
     logs: list[str] = []
 
 @router.post("/", response_model=JobStatus)
-def create_job(job: JobCreate, service: JobExecutionService = Depends(get_job_service)):
-    job_id = service.create_job(job.messages, job.channels, job.recipients_filter)
+async def create_job(job: JobCreate, service: JobExecutionService = Depends(get_job_service)):
+    job_id = await service.create_job(job.messages, job.channels, job.recipients_filter)
     return JobStatus(job_id=job_id, status="queued", logs=[])
 
 @router.get("/{job_id}", response_model=JobStatus)
