@@ -16,6 +16,7 @@ interface ChatInterfaceProps {
     messages?: ChatMessage[];
     onSendMessage?: (query: string) => void;
     isLoading?: boolean;
+    isInitialLoading?: boolean;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -24,7 +25,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   approvedActions = [],
   messages: externalMessages,
   onSendMessage: externalSendMessage,
-  isLoading: externalIsLoading
+  isLoading: externalIsLoading,
+  isInitialLoading = false
 }) => {
   const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -76,7 +78,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [externalMessages]);
 
   const sendQuery = async (queryText: string) => {
-    if (!queryText.trim()) return;
+    if (!queryText.trim() || isInitialLoading) return;
 
     if (externalSendMessage) {
       externalSendMessage(queryText);
@@ -133,15 +135,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Subtle Compact Card Header */}
       <div className="flex justify-between items-center pb-1.5 border-b border-border/50 text-xs">
         <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+          <span className={`w-1.5 h-1.5 rounded-full ${isInitialLoading ? 'bg-warning animate-ping' : 'bg-primary'}`}></span>
           <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Copilot Intelligence</span>
         </div>
-        <span className="text-[10px] font-mono text-neutral-foreground">CORTEX LLM</span>
+        <span className="text-[10px] font-mono text-neutral-foreground">
+          {isInitialLoading ? 'SYNCING DB...' : 'CORTEX LLM'}
+        </span>
       </div>
 
       {/* Messages Feed */}
       <div className="card-content flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
-        {messages.length === 0 && (
+        {isInitialLoading && (
+          <div className="flex flex-col gap-2.5 p-2 animate-pulse">
+            <div className="flex items-center gap-2 text-neutral-foreground text-xs p-1">
+              <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+              <span className="font-medium text-foreground">Fetching transcript from Snowflake DB...</span>
+            </div>
+            <div className="h-10 bg-neutral/15 rounded-xl w-3/4"></div>
+            <div className="h-14 bg-primary/10 rounded-xl w-4/5 ml-auto"></div>
+            <div className="h-12 bg-neutral/15 rounded-xl w-2/3"></div>
+          </div>
+        )}
+
+        {!isInitialLoading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-neutral-foreground px-4">
             <p className="font-medium text-foreground text-xs mb-1">Decision Support Agent</p>
             <p className="text-[11px] text-neutral-foreground mb-3">Ask about real-time risk, resource deployment, or public advisories.</p>
@@ -161,7 +177,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         )}
 
-        {messages.map((msg, idx) => (
+        {!isInitialLoading && messages.map((msg, idx) => (
           <div key={idx} className={`p-2.5 rounded-xl max-w-[88%] shadow-xs transition-all ${
             msg.role === 'user' 
               ? 'bg-primary/15 border border-primary/30 text-foreground ml-auto' 
@@ -218,7 +234,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             )}
           </div>
         ))}
-        {isLoading && (
+        {isLoading && !isInitialLoading && (
           <div className="flex items-center gap-2 text-neutral-foreground text-xs p-1">
             <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
             <span>Analyzing Cortex telemetry...</span>
@@ -232,15 +248,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <input
           type="text"
           value={input}
+          disabled={isLoading || isInitialLoading}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          className="form-input flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-background border-border"
-          placeholder="Ask operational prompt..."
+          className="form-input flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-background border-border disabled:opacity-50"
+          placeholder={isInitialLoading ? "Connecting to Snowflake..." : "Ask operational prompt..."}
         />
         <button
           onClick={handleSend}
-          disabled={isLoading}
-          className="button button-primary button-sm px-3 py-1.5 text-xs font-semibold"
+          disabled={isLoading || isInitialLoading}
+          className="button button-primary button-sm px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
         >
           Send
         </button>

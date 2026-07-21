@@ -15,6 +15,7 @@ const OperationalDashboard: React.FC = () => {
     const [activeJobId, setActiveJobId] = useState<string | null>(null);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [approvedActions, setApprovedActions] = useState<string[]>(() => {
         try {
             const saved = localStorage.getItem('sentinel_approved_actions');
@@ -67,6 +68,8 @@ const OperationalDashboard: React.FC = () => {
                 }
             } catch (err) {
                 console.error("Failed to load initial operational data from backend", err);
+            } finally {
+                setIsInitialLoading(false);
             }
         };
         fetchInitialAuditData();
@@ -220,11 +223,18 @@ const OperationalDashboard: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-neutral-foreground">
-                    <span>HOTKEYS:</span>
-                    <span className="px-1.5 py-0.5 rounded bg-neutral/15 border border-border text-foreground font-bold">[1-4]</span>
-                    <span>SWITCH TABS</span>
-                </div>
+                {isInitialLoading ? (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary animate-pulse font-medium">
+                        <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                        <span>Syncing Snowflake DB...</span>
+                    </div>
+                ) : (
+                    <div className="hidden lg:flex items-center gap-2 text-[11px] font-mono text-neutral-foreground">
+                        <span>HOTKEYS:</span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral/15 border border-border text-foreground font-bold">[1-4]</span>
+                        <span>SWITCH TABS</span>
+                    </div>
+                )}
             </div>
 
             {/* Tab Viewport */}
@@ -249,6 +259,7 @@ const OperationalDashboard: React.FC = () => {
                                     messages={chatMessages}
                                     onSendMessage={handleSendChatMessage}
                                     isLoading={isChatLoading}
+                                    isInitialLoading={isInitialLoading}
                                     onApproveAction={handleApproveAction}
                                     onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}
                                     approvedActions={approvedActions}
@@ -284,6 +295,7 @@ const OperationalDashboard: React.FC = () => {
                                 messages={chatMessages}
                                 onSendMessage={handleSendChatMessage}
                                 isLoading={isChatLoading}
+                                isInitialLoading={isInitialLoading}
                                 onApproveAction={handleApproveAction}
                                 onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}
                                 approvedActions={approvedActions}
