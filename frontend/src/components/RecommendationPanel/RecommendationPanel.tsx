@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 interface Recommendations {
     risk_level: string;
     confidence_score: number;
@@ -9,13 +11,17 @@ interface Recommendations {
     recommended_actions: string[];
 }
 
-const RecommendationPanel: React.FC<{ onApprove: (action: string) => void }> = ({ onApprove }) => {
+interface RecommendationPanelProps {
+    onApprove: (action: string) => void;
+}
+
+const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove }) => {
     const [recs, setRecs] = useState<Recommendations | null>(null);
 
     useEffect(() => {
         const fetchRecs = async () => {
             try {
-                const res = await axios.get('http://localhost:8000/api/v1/copilot/recommendations');
+                const res = await axios.get(`${API_BASE_URL}/api/v1/copilot/recommendations`);
                 setRecs(res.data);
             } catch (e) {
                 console.error("Failed to fetch recommendations", e);
@@ -24,47 +30,79 @@ const RecommendationPanel: React.FC<{ onApprove: (action: string) => void }> = (
         fetchRecs();
     }, []);
 
-    if (!recs) return <div className="p-4 border rounded shadow bg-white">Loading Recommendations...</div>;
+    if (!recs) return (
+        <div className="card h-full p-3 flex flex-col items-center justify-center text-neutral-foreground bg-card border-border">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mb-1"></div>
+            <span className="text-xs font-mono">Loading...</span>
+        </div>
+    );
 
     return (
-        <div className="p-4 border rounded shadow bg-white flex flex-col gap-4 h-full">
-            <h2 className="font-bold text-lg border-b pb-2">Active Recommendations</h2>
-
-            <div className="flex gap-4">
-                <div className="flex-1 bg-red-100 p-3 rounded text-center border border-red-200">
-                    <div className="text-red-700 font-bold">{recs.risk_level}</div>
-                    <div className="text-xs text-red-600">{recs.confidence_score}% Confidence</div>
+        <div className="card h-full flex flex-col p-3 gap-2 overflow-hidden border-border bg-card shadow-xs">
+            {/* Subtle Compact Card Header */}
+            <div className="flex justify-between items-center pb-1.5 border-b border-border/50 text-xs">
+                <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning"></span>
+                    <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Active Recommendations</span>
                 </div>
-                <div className="flex-1 bg-blue-100 p-3 rounded text-center border border-blue-200">
-                    <div className="text-blue-700 font-bold">{recs.affected_population.toLocaleString()}</div>
-                    <div className="text-xs text-blue-600">Affected Residents</div>
+                <span className="text-[10px] font-mono text-neutral-foreground">CORTEX ENGINE</span>
+            </div>
+
+            {/* Metric Stat Cards */}
+            <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded-lg border border-danger/30 bg-danger/10 text-center flex flex-col items-center justify-center">
+                    <span className="text-[10px] uppercase font-semibold text-danger tracking-wider">Alert Status</span>
+                    <span className="badge badge-danger text-xs font-bold px-2 py-0.5 mt-0.5">{recs.risk_level}</span>
+                    <div className="text-[10px] text-neutral-foreground font-mono mt-0.5">
+                        {recs.confidence_score}% Confidence
+                    </div>
+                </div>
+
+                <div className="p-2 rounded-lg border border-border bg-neutral/15 text-center flex flex-col items-center justify-center">
+                    <span className="text-[10px] uppercase font-semibold text-neutral-foreground tracking-wider">Impact Radius</span>
+                    <div className="text-base font-extrabold text-foreground tracking-tight">{recs.affected_population.toLocaleString()}</div>
+                    <div className="text-[10px] text-neutral-foreground">Affected Residents</div>
                 </div>
             </div>
 
-            <div>
-                <strong className="text-sm text-gray-700">Affected Barangays:</strong>
-                <p className="text-sm text-gray-600">{recs.affected_barangays.join(", ")}</p>
+            {/* Barangays List */}
+            <div className="text-xs space-y-0.5">
+                <div className="flex justify-between items-center text-neutral-foreground text-[10px] uppercase font-semibold">
+                    <span>High Risk Zones:</span>
+                    <span className="font-mono">{recs.affected_barangays.length} Barangays</span>
+                </div>
+                <div className="flex flex-wrap gap-1 bg-neutral/10 p-1.5 rounded-lg border border-border/60">
+                    {recs.affected_barangays.map((b, i) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-card text-foreground border border-border text-[10px] font-medium">
+                            {b}
+                        </span>
+                    ))}
+                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-                <strong className="text-sm text-gray-700 block mb-2">Recommended Actions:</strong>
-                <div className="flex flex-col gap-2">
+            {/* Action Items */}
+            <div className="card-content flex-1 overflow-y-auto pr-1 space-y-1.5">
+                <strong className="text-[10px] text-neutral-foreground uppercase tracking-wider block">Directives:</strong>
+                <div className="flex flex-col gap-1.5">
                     {recs.recommended_actions.map((action, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 border rounded text-sm">
-                            <span>{action}</span>
+                        <div key={idx} className="flex justify-between items-center p-2 bg-neutral/10 hover:bg-neutral/20 border border-border/70 rounded-lg text-xs transition-colors">
+                            <span className="text-foreground font-medium text-xs pr-2">{action}</span>
                             <button
                                 onClick={() => onApprove(action)}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                                className="button button-primary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
                             >
                                 Approve
                             </button>
                         </div>
                     ))}
-                    <div className="flex justify-between items-center p-2 bg-gray-50 border rounded text-sm">
-                        <span>Dispatch Emergency Notifications</span>
+                    <div className="flex justify-between items-center p-2 bg-primary/10 hover:bg-primary/15 border border-primary/30 rounded-lg text-xs transition-colors">
+                        <div className="flex flex-col">
+                            <span className="text-foreground font-semibold text-xs">Dispatch Alerts</span>
+                            <span className="text-[10px] text-neutral-foreground font-mono">SMS & Email Broadcast</span>
+                        </div>
                         <button
                             onClick={() => onApprove("Dispatch Notifications")}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                            className="button button-secondary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
                         >
                             Approve
                         </button>

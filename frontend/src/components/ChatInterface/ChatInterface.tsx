@@ -14,6 +14,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const SUGGESTED_PROMPTS = [
+    "What is the flood risk?",
+    "What should we do?",
+    "Notify affected residents"
+  ];
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -22,19 +28,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const sendQuery = async (queryText: string) => {
+    if (!queryText.trim()) return;
 
     if (onAiQuery) onAiQuery();
 
-    const userMsg = input;
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setMessages(prev => [...prev, { role: 'user', text: queryText }]);
     setInput('');
     setIsLoading(true);
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/v1/copilot/ask`, {
-        query: userMsg
+        query: queryText
       });
 
       const aiResponse = response.data;
@@ -58,97 +63,122 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
     }
   };
 
-  const handleApproveAction = async (action: string) => {
-    if (action.includes("Approve Notification Dispatch") || action.includes("Orange Alert")) {
-         setMessages(prev => [...prev, { role: 'system', text: `Executing Action: ${action}... dispatching job...` }]);
-
-         try {
-             // Mock creating a job
-             const jobRes = await axios.post(`${API_BASE_URL}/api/v1/jobs/`, {
-                 messages: ["EMERGENCY: Proceed to evacuation centers immediately."],
-                 channels: ["sms", "email"],
-                 recipients_filter: "high_risk_zones"
-             });
-
-             const jobId = jobRes.data.job_id;
-             setMessages(prev => [...prev, { role: 'system', text: `Job Executed. Job ID: ${jobId}. Fetching status...` }]);
-
-             // Quick poll for demo purposes
-             setTimeout(async () => {
-                const statusRes = await axios.get(`${API_BASE_URL}/api/v1/jobs/${jobId}`);
-                setMessages(prev => [...prev, {
-                    role: 'system',
-                    text: `Job Status: ${statusRes.data.status}.\nLogs:\n${statusRes.data.logs.join('\n')}`
-                }]);
-             }, 1500);
-
-         } catch (e) {
-             console.error("Failed to execute job", e);
-         }
-    } else {
-        setMessages(prev => [...prev, { role: 'system', text: `Action logged: ${action}` }]);
-    }
+  const handleSend = () => {
+    sendQuery(input);
   };
 
-  const handleLocalApprove = async (action: string) => {
-    setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}` }]);
+  const handleLocalApprove = (action: string) => {
+    setMessages(prev => [...prev, { role: 'system', text: `Action requested: ${action}. Dispatching job...` }]);
     if (onApproveAction) {
         onApproveAction(action);
     }
-    await handleApproveAction(action);
   };
 
   return (
-    <div className="flex flex-col h-full border rounded shadow-sm bg-white">
-      <div className="flex-1 p-4 overflow-y-auto space-y-4">
+    <div className="card h-full flex flex-col p-3 gap-2 overflow-hidden border-border bg-card shadow-xs">
+      {/* Subtle Compact Card Header */}
+      <div className="flex justify-between items-center pb-1.5 border-b border-border/50 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+          <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Copilot Intelligence</span>
+        </div>
+        <span className="text-[10px] font-mono text-neutral-foreground">CORTEX LLM</span>
+      </div>
+
+      {/* Messages Feed */}
+      <div className="card-content flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
         {messages.length === 0 && (
-            <div className="text-gray-400 text-center mt-10">
-                Ask me about flood risks, resources, or dispatching alerts.
+          <div className="flex flex-col items-center justify-center h-full text-center text-neutral-foreground px-4">
+            <p className="font-medium text-foreground text-xs mb-1">Decision Support Agent</p>
+            <p className="text-[11px] text-neutral-foreground mb-3">Ask about real-time risk, resource deployment, or public advisories.</p>
+
+            {/* Suggested Prompts */}
+            <div className="flex flex-wrap justify-center gap-1.5 w-full">
+              {SUGGESTED_PROMPTS.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendQuery(prompt)}
+                  className="px-2 py-0.5 rounded bg-neutral/15 hover:bg-neutral/25 border border-border text-[11px] text-foreground font-medium transition-all"
+                >
+                  "{prompt}"
+                </button>
+              ))}
             </div>
+          </div>
         )}
+
         {messages.map((msg, idx) => (
-          <div key={idx} className={`p-3 rounded-lg max-w-[85%] ${msg.role === 'user' ? 'bg-blue-50 ml-auto' : msg.role === 'system' ? 'bg-gray-800 text-green-400 text-xs font-mono mx-auto w-full' : 'bg-gray-50 border'}`}>
-            <strong className="block mb-1 text-sm text-gray-500">
-                {msg.role === 'user' ? 'You' : msg.role === 'system' ? 'System' : 'Sentinel AI'}
-            </strong>
-            <div className={`whitespace-pre-wrap ${msg.role === 'system' ? '' : 'text-gray-800'}`}>{msg.text}</div>
+          <div key={idx} className={`p-2.5 rounded-xl max-w-[88%] shadow-xs transition-all ${
+            msg.role === 'user' 
+              ? 'bg-primary/15 border border-primary/30 text-foreground ml-auto' 
+              : msg.role === 'system' 
+              ? 'bg-neutral/20 border border-border text-foreground font-mono text-[11px] w-full' 
+              : 'bg-neutral/10 border border-border text-foreground'
+          }`}>
+            <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-neutral-foreground">
+              {msg.role === 'user' ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <span>Emergency Officer</span>
+                </>
+              ) : msg.role === 'system' ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  <span>System Log</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning"></span>
+                  <span className="text-warning font-bold">Sentinel AI</span>
+                </>
+              )}
+            </div>
+
+            <div className="whitespace-pre-wrap leading-relaxed text-xs">{msg.text}</div>
 
             {msg.recommendations && msg.recommendations.length > 0 && (
-                <div className="mt-3 border-t pt-2">
-                    <strong className="text-xs text-gray-500 block mb-2">Recommended Actions:</strong>
-                    <div className="flex flex-wrap gap-2">
-                        {msg.recommendations.map((rec, i) => (
-                            <button
-                                key={i}
-                                onClick={() => handleLocalApprove(rec)}
-                                className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
-                            >
-                                {rec}
-                            </button>
-                        ))}
-                    </div>
+              <div className="mt-2 border-t border-border/70 pt-1.5">
+                <strong className="text-[10px] uppercase font-bold text-neutral-foreground tracking-wider block mb-1">Directives:</strong>
+                <div className="flex flex-wrap gap-1">
+                  {msg.recommendations.map((rec, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleLocalApprove(rec)}
+                      className="button button-primary button-sm text-[10px] font-semibold px-2 py-0.5 rounded"
+                    >
+                      {rec}
+                    </button>
+                  ))}
                 </div>
+              </div>
             )}
           </div>
         ))}
-        {isLoading && <div className="text-gray-400 text-sm">Sentinel AI is thinking...</div>}
+        {isLoading && (
+          <div className="flex items-center gap-2 text-neutral-foreground text-xs p-1">
+            <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+            <span>Analyzing Cortex telemetry...</span>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="p-3 border-t bg-gray-50 flex gap-2">
+
+      {/* Input Bar */}
+      <div className="pt-2 border-t border-border flex gap-1.5">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          className="flex-1 border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500"
-          placeholder="Ask operational questions..."
+          className="form-input flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-background border-border"
+          placeholder="Ask operational prompt..."
         />
         <button
-            onClick={handleSend}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors disabled:opacity-50"
+          onClick={handleSend}
+          disabled={isLoading}
+          className="button button-primary button-sm px-3 py-1.5 text-xs font-semibold"
         >
-            Send
+          Send
         </button>
       </div>
     </div>
