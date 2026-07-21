@@ -61,12 +61,17 @@ CREATE OR REPLACE TABLE audit_logs (
     timestamp TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
--- Optional: Create Job Execution Engine tables in Snowflake if it acts as a data store for the engine.
+-- Job Execution Engine tables in Snowflake
 CREATE OR REPLACE TABLE execution_jobs (
     job_id STRING PRIMARY KEY,
     status STRING,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    messages VARIANT,
+    channels VARIANT,
+    recipients_filter STRING,
+    logs VARIANT,
+    counts VARIANT,
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE OR REPLACE TABLE execution_tasks (
@@ -76,6 +81,6 @@ CREATE OR REPLACE TABLE execution_tasks (
     payload VARIANT,
     status STRING,
     retry_count INTEGER,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
