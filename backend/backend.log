@@ -1,0 +1,33 @@
+INFO:     Started server process [101486]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:38596 - "HEAD /health HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:35602 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35608 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35608 - "OPTIONS /api/v1/copilot/ask HTTP/1.1" 200 OK
+2026-07-21 05:31:59 [warning  ] using_placeholder_snowflake_credentials_skipping_connection
+2026-07-21 05:31:59 [info     ] processing_copilot_query       context=None query='What is the flood risk in Cagayan de Oro?'
+INFO:     127.0.0.1:35602 - "POST /api/v1/copilot/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35602 - "OPTIONS /api/v1/jobs/ HTTP/1.1" 200 OK
+2026-07-21 05:32:02 [info     ] job_created                    channels=['sms', 'email'] filter=high_risk_zones job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
+INFO:     127.0.0.1:35608 - "POST /api/v1/jobs/ HTTP/1.1" 200 OK
+2026-07-21 05:32:04 [info     ] job_processing_started         job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
+2026-07-21 05:32:04 [info     ] dispatching_sms                target=high_risk_zones
+2026-07-21 05:32:04 [info     ] dispatching_email              target=high_risk_zones
+2026-07-21 05:32:04 [info     ] job_completed                  job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
+INFO:     127.0.0.1:35608 - "GET /api/v1/jobs/a4d1239a-ef22-462d-9373-5a3db6c96de2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37646 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37658 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37658 - "OPTIONS /api/v1/copilot/ask HTTP/1.1" 200 OK
+2026-07-21 05:33:53 [warning  ] using_placeholder_snowflake_credentials_skipping_connection
+2026-07-21 05:33:53 [info     ] processing_copilot_query       context=None query='What is the flood risk in Cagayan de Oro?'
+INFO:     127.0.0.1:37646 - "POST /api/v1/copilot/ask HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37646 - "OPTIONS /api/v1/jobs/ HTTP/1.1" 200 OK
+2026-07-21 05:33:56 [info     ] job_created                    channels=['sms', 'email'] filter=high_risk_zones job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
+INFO:     127.0.0.1:37658 - "POST /api/v1/jobs/ HTTP/1.1" 200 OK
+2026-07-21 05:33:57 [info     ] job_processing_started         job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
+2026-07-21 05:33:57 [info     ] dispatching_sms                target=high_risk_zones
+2026-07-21 05:33:57 [info     ] dispatching_email              target=high_risk_zones
+2026-07-21 05:33:57 [info     ] job_completed                  job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
+INFO:     127.0.0.1:37658 - "GET /api/v1/jobs/d5b5c8a4-eb9b-40f2-b5d6-77121663d06b HTTP/1.1" 200 OK
