@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import OperationalDashboard from './components/OperationalDashboard/OperationalDashboard';
 import './App.css';
 
+const JURISDICTION_CITY = import.meta.env.VITE_DEFAULT_JURISDICTION_CITY || 'ZAMBOANGA CITY';
+
 function App() {
   const [timeStr, setTimeStr] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -60,7 +62,7 @@ function App() {
           <div className="hidden lg:flex items-center gap-3 text-neutral-foreground bg-neutral/10 px-3 py-1.5 rounded-lg border border-border">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-success"></span>
-              JURISDICTION: <strong className="text-foreground font-semibold">ZAMBOANGA CITY</strong>
+              JURISDICTION: <strong className="text-foreground font-semibold uppercase">{JURISDICTION_CITY}</strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-foreground font-bold">{timeStr}</span>

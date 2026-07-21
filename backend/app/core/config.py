@@ -13,6 +13,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # Jurisdiction & Region Configuration
+    DEFAULT_JURISDICTION_CITY: str = "Zamboanga City"
+    DEFAULT_JURISDICTION_REGION: str = "Zamboanga Peninsula"
+    DEFAULT_MAP_LATITUDE: float = 6.9214
+    DEFAULT_MAP_LONGITUDE: float = 122.0790
+    DEFAULT_MAP_ZOOM: float = 12.5
+
     # Snowflake / CoCo CLI Configuration
     SNOWFLAKE_ACCOUNT: str = "placeholder_account"
     SNOWFLAKE_USER: str = "placeholder_user"

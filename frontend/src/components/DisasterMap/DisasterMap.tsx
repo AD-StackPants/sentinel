@@ -4,6 +4,9 @@ import axios from 'axios';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const DEFAULT_LNG = parseFloat(import.meta.env.VITE_DEFAULT_MAP_LONGITUDE) || 122.0790;
+const DEFAULT_LAT = parseFloat(import.meta.env.VITE_DEFAULT_MAP_LATITUDE) || 6.9214;
+const DEFAULT_ZOOM = parseFloat(import.meta.env.VITE_DEFAULT_MAP_ZOOM) || 12.5;
 
 const DisasterMap: React.FC = () => {
   const [geoData, setGeoData] = useState<any>(null);
@@ -63,9 +66,9 @@ const DisasterMap: React.FC = () => {
 
       <Map
         initialViewState={{
-          longitude: 122.0790, // Zamboanga City
-          latitude: 6.9214,
-          zoom: 12.5
+          longitude: DEFAULT_LNG,
+          latitude: DEFAULT_LAT,
+          zoom: DEFAULT_ZOOM
         }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
       >

@@ -27,7 +27,7 @@ const AuditTimeline: React.FC<AuditTimelineProps> = ({ events }) => {
                     {events.map((ev, idx) => (
                         <div key={idx} className="mb-3.5 ml-4 relative">
                             {/* Subtle glowing node */}
-                            <span className={`absolute flex items-center justify-center w-2.5 h-2.5 rounded-full -left-[21.5px] top-0.5 ring-2 ring-card ${
+                            <span className={`absolute flex items-center justify-center w-2.5 h-2.5 rounded-full left-[-21.5px] top-0.5 ring-2 ring-card ${
                                 ev.type === 'ai_assessment' ? 'bg-warning' :
                                 ev.type === 'user_approval' ? 'bg-primary' : 'bg-success'
                             }`}>

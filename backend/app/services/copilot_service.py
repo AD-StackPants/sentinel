@@ -1,7 +1,8 @@
-import snowflake.connector
-import structlog
 import json
 import re
+
+import snowflake.connector
+import structlog
 
 from app.core.config import settings
 
@@ -111,6 +112,7 @@ class CopilotService:
                     ORDER BY r.water_level DESC
                 """)
                 rows = cursor.fetchall()
+                print(rows)
 
                 if rows:
                     high_risk_barangays = [r[0] for r in rows if r[1] >= 6.0]
