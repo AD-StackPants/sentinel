@@ -25,7 +25,9 @@ CREATE OR REPLACE TABLE river_sensors (
     sensor_id STRING,
     barangay STRING,
     water_level FLOAT,
-    timestamp TIMESTAMP
+    timestamp TIMESTAMP,
+    latitude FLOAT,
+    longitude FLOAT
 );
 
 CREATE OR REPLACE TABLE barangays (
@@ -40,13 +42,17 @@ CREATE OR REPLACE TABLE evacuation_centers (
     name STRING,
     capacity INTEGER,
     current_occupancy INTEGER,
-    barangay STRING
+    barangay STRING,
+    latitude FLOAT,
+    longitude FLOAT
 );
 
 CREATE OR REPLACE TABLE hospitals (
     hospital STRING,
     beds_available INTEGER,
-    barangay STRING
+    barangay STRING,
+    latitude FLOAT,
+    longitude FLOAT
 );
 
 CREATE OR REPLACE TABLE citizen_contacts (

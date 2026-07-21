@@ -94,161 +94,83 @@ def _fetch_snowflake_map_features():
                         }
                     })
 
-        # 2. Fetch Evacuation Centers joined with barangay coordinates
+        # 2. Fetch Evacuation Centers directly from Snowflake DB
         cursor.execute("""
-            SELECT e.name, e.capacity, e.current_occupancy, b.latitude, b.longitude
-            FROM evacuation_centers e
-            JOIN barangays b ON e.barangay = b.barangay
+            SELECT name, capacity, current_occupancy, latitude, longitude
+            FROM evacuation_centers
         """)
         for row in cursor.fetchall():
             name, cap, occ, lat, lon = row
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "type": "evacuation_center",
-                    "name": name,
-                    "capacity": cap,
-                    "occupancy": occ
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [float(lon), float(lat)]
-                }
-            })
+            if lat is not None and lon is not None:
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "type": "evacuation_center",
+                        "name": name,
+                        "capacity": cap,
+                        "occupancy": occ
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [float(lon), float(lat)]
+                    }
+                })
 
-        # 3. Fetch Hospitals joined with barangay coordinates
+        # 3. Fetch Hospitals directly from Snowflake DB
         cursor.execute("""
-            SELECT h.hospital, h.beds_available, b.latitude, b.longitude
-            FROM hospitals h
-            LEFT JOIN barangays b ON h.barangay = b.barangay
+            SELECT hospital, beds_available, latitude, longitude
+            FROM hospitals
         """)
         for row in cursor.fetchall():
             h_name, beds, lat, lon = row
-            # Fallback coords for hospitals outside mapped barangays
-            lat_val = float(lat) if lat else 6.9350
-            lon_val = float(lon) if lon else 122.0750
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "type": "hospital",
-                    "name": h_name,
-                    "beds": beds
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [lon_val, lat_val]
-                }
-            })
+            if lat is not None and lon is not None:
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "type": "hospital",
+                        "name": h_name,
+                        "beds": beds
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [float(lon), float(lat)]
+                    }
+                })
 
-        # 4. Fetch River Sensors joined with barangay coordinates
+        # 4. Fetch River Sensors directly from Snowflake DB
         cursor.execute("""
-            SELECT r.sensor_id, r.water_level, b.latitude, b.longitude
-            FROM river_sensors r
-            JOIN barangays b ON r.barangay = b.barangay
+            SELECT sensor_id, water_level, latitude, longitude
+            FROM river_sensors
         """)
         for row in cursor.fetchall():
             s_id, level, lat, lon = row
-            status = "Critical" if level >= 8.0 else ("Warning" if level >= 6.0 else "Normal")
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "type": "sensor",
-                    "name": s_id,
-                    "level": f"{level}m",
-                    "status": status
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [float(lon), float(lat)]
-                }
-            })
+            if lat is not None and lon is not None:
+                status = "Critical" if level >= 8.0 else ("Warning" if level >= 6.0 else "Normal")
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "type": "sensor",
+                        "name": s_id,
+                        "level": f"{level}m",
+                        "status": status
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [float(lon), float(lat)]
+                    }
+                })
 
         cursor.close()
         conn.close()
         return {"type": "FeatureCollection", "features": features}
     except Exception as e:
         logger.error("failed_to_fetch_snowflake_map_data", error=str(e))
-        return None
+        return {"type": "FeatureCollection", "features": []}
 
 @router.get("/data")
 def get_map_data():
-    """Returns dynamic GeoJSON map data fetched from Snowflake database, with static fallback."""
+    """Returns dynamic GeoJSON map data fetched live from active Snowflake database."""
     db_features = _fetch_snowflake_map_features()
-    if db_features and db_features.get("features"):
+    if db_features and "features" in db_features:
         return db_features
-
-    # Fallback GeoJSON data for Zamboanga City demo scenario
-    return {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "properties": {
-                    "type": "risk_zone",
-                    "name": "Tumaga River High-Risk Flood Zone",
-                    "risk_level": "High"
-                },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [122.0600, 6.9500],
-                        [122.0800, 6.9500],
-                        [122.0900, 6.9200],
-                        [122.0500, 6.9200],
-                        [122.0600, 6.9500]
-                    ]]
-                }
-            },
-            {
-                "type": "Feature",
-                "properties": {
-                    "type": "evacuation_center",
-                    "name": "Tumaga Gymnasium",
-                    "capacity": 800,
-                    "occupancy": 210
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [122.0650, 6.9450]
-                }
-            },
-            {
-                "type": "Feature",
-                "properties": {
-                    "type": "evacuation_center",
-                    "name": "City Coliseum Tetuan",
-                    "capacity": 2500,
-                    "occupancy": 650
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [122.0850, 6.9250]
-                }
-            },
-            {
-                "type": "Feature",
-                "properties": {
-                    "type": "hospital",
-                    "name": "Zamboanga City Medical Center (ZCMC)",
-                    "beds": 65
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [122.0750, 6.9350]
-                }
-            },
-            {
-                "type": "Feature",
-                "properties": {
-                    "type": "sensor",
-                    "name": "ZAM-TUMAGA-01",
-                    "level": "8.8m",
-                    "status": "Critical"
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [122.0630, 6.9480]
-                }
-            }
-        ]
-    }
+    return {"type": "FeatureCollection", "features": []}

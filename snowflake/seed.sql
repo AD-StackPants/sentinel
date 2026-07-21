@@ -36,43 +36,43 @@ INSERT INTO barangays (barangay, city, population, latitude, longitude) VALUES
 ('Curuan', 'Zamboanga City', 11800, 7.2150, 122.2420),
 ('Vitali', 'Zamboanga City', 14200, 7.3600, 122.2800);
 
--- 3. River Sensors (Real Telemetry Station Network across River Basins)
-INSERT INTO river_sensors (sensor_id, barangay, water_level, timestamp) VALUES
-('ZAM-TUMAGA-01', 'Tumaga', 8.8, CURRENT_TIMESTAMP),
-('ZAM-STAMARIA-01', 'Sta. Maria', 7.4, CURRENT_TIMESTAMP),
-('ZAM-TETUAN-01', 'Tetuan', 6.9, CURRENT_TIMESTAMP),
-('ZAM-TUGBUNGAN-01', 'Tugbungan', 7.1, CURRENT_TIMESTAMP),
-('ZAM-TALONTALON-01', 'Talon-Talon', 6.8, CURRENT_TIMESTAMP),
-('ZAM-MANICAHAN-01', 'Manicahan', 6.2, CURRENT_TIMESTAMP),
-('ZAM-PASONANCA-01', 'Pasonanca', 4.5, CURRENT_TIMESTAMP),
-('ZAM-SANJOSE-01', 'San Jose Gusu', 5.2, CURRENT_TIMESTAMP),
-('ZAM-BALIWASAN-01', 'Baliwasan', 4.8, CURRENT_TIMESTAMP),
-('ZAM-MERCEDES-01', 'Mercedes', 5.5, CURRENT_TIMESTAMP),
-('ZAM-AYALA-01', 'Ayala', 3.9, CURRENT_TIMESTAMP),
-('ZAM-VITALI-01', 'Vitali', 3.1, CURRENT_TIMESTAMP);
+-- 3. River Sensors (Real Telemetry Station Network across River Basins with distinct coordinates)
+INSERT INTO river_sensors (sensor_id, barangay, water_level, timestamp, latitude, longitude) VALUES
+('ZAM-TUMAGA-01', 'Tumaga', 8.8, CURRENT_TIMESTAMP, 6.9440, 122.0630),
+('ZAM-STAMARIA-01', 'Sta. Maria', 7.4, CURRENT_TIMESTAMP, 6.9355, 122.0740),
+('ZAM-TETUAN-01', 'Tetuan', 6.9, CURRENT_TIMESTAMP, 6.9230, 122.0840),
+('ZAM-TUGBUNGAN-01', 'Tugbungan', 7.1, CURRENT_TIMESTAMP, 6.9185, 122.0940),
+('ZAM-TALONTALON-01', 'Talon-Talon', 6.8, CURRENT_TIMESTAMP, 6.9060, 122.1040),
+('ZAM-MANICAHAN-01', 'Manicahan', 6.2, CURRENT_TIMESTAMP, 7.0185, 122.1980),
+('ZAM-PASONANCA-01', 'Pasonanca', 4.5, CURRENT_TIMESTAMP, 6.9580, 122.0690),
+('ZAM-SANJOSE-01', 'San Jose Gusu', 5.2, CURRENT_TIMESTAMP, 6.9200, 122.0510),
+('ZAM-BALIWASAN-01', 'Baliwasan', 4.8, CURRENT_TIMESTAMP, 6.9140, 122.0590),
+('ZAM-MERCEDES-01', 'Mercedes', 5.5, CURRENT_TIMESTAMP, 6.9470, 122.1330),
+('ZAM-AYALA-01', 'Ayala', 3.9, CURRENT_TIMESTAMP, 6.9600, 121.9520),
+('ZAM-VITALI-01', 'Vitali', 3.1, CURRENT_TIMESTAMP, 7.3580, 122.2780);
 
--- 4. Evacuation Centers (Real Infrastructure Landmarks)
-INSERT INTO evacuation_centers (name, capacity, current_occupancy, barangay) VALUES
-('Tumaga Gymnasium', 800, 450, 'Tumaga'),
-('City Coliseum Tetuan', 2500, 1200, 'Tetuan'),
-('Don Pablo Lorenzo Memorial High School', 1500, 680, 'Sta. Maria'),
-('Tugbungan Elementary School', 900, 320, 'Tugbungan'),
-('Talon-Talon National High School', 1200, 510, 'Talon-Talon'),
-('Manicahan Elementary School', 600, 180, 'Manicahan'),
-('Pasonanca Elementary School', 750, 120, 'Pasonanca'),
-('WMSU Gymnasium (Western Mindanao State Univ)', 3000, 850, 'Baliwasan'),
-('Southcom Elementary School', 1000, 250, 'Calarian'),
-('Ayala National High School', 1100, 190, 'Ayala');
+-- 4. Evacuation Centers (Real Infrastructure Landmarks with distinct coordinates)
+INSERT INTO evacuation_centers (name, capacity, current_occupancy, barangay, latitude, longitude) VALUES
+('Tumaga Gymnasium', 800, 450, 'Tumaga', 6.9465, 122.0640),
+('City Coliseum Tetuan', 2500, 1200, 'Tetuan', 6.9240, 122.0860),
+('Don Pablo Lorenzo Memorial High School', 1500, 680, 'Sta. Maria', 6.9370, 122.0760),
+('Tugbungan Elementary School', 900, 320, 'Tugbungan', 6.9175, 122.0960),
+('Talon-Talon National High School', 1200, 510, 'Talon-Talon', 6.9040, 122.1060),
+('Manicahan Elementary School', 600, 180, 'Manicahan', 7.0215, 122.2010),
+('Pasonanca Elementary School', 750, 120, 'Pasonanca', 6.9560, 122.0710),
+('WMSU Gymnasium (Western Mindanao State Univ)', 3000, 850, 'Baliwasan', 6.9120, 122.0620),
+('Southcom Elementary School', 1000, 250, 'Calarian', 6.9290, 122.0160),
+('Ayala National High School', 1100, 190, 'Ayala', 6.9630, 121.9550);
 
--- 5. Hospitals (Active Zamboanga City Healthcare Facilities)
-INSERT INTO hospitals (hospital, beds_available, barangay) VALUES
-('Zamboanga City Medical Center (ZCMC)', 65, 'Sta. Maria'),
-('West Metro Medical Center', 50, 'Sta. Maria'),
-('Zamboanga Doctors Hospital', 45, 'Tumaga'),
-('Brent Hospital and Colleges', 30, 'Pasonanca'),
-('Ciudad Medical Zamboanga', 40, 'Guiwan'),
-('Universidad de Zamboanga Medical Center', 35, 'Tetuan'),
-('Labuan General Hospital', 20, 'Calarian');
+-- 5. Hospitals (Active Zamboanga City Healthcare Facilities with distinct coordinates)
+INSERT INTO hospitals (hospital, beds_available, barangay, latitude, longitude) VALUES
+('Zamboanga City Medical Center (ZCMC)', 65, 'Sta. Maria', 6.9335, 122.0735),
+('West Metro Medical Center', 50, 'Sta. Maria', 6.9385, 122.0775),
+('Zamboanga Doctors Hospital', 45, 'Tumaga', 6.9430, 122.0670),
+('Brent Hospital and Colleges', 30, 'Pasonanca', 6.9520, 122.0680),
+('Ciudad Medical Zamboanga', 40, 'Guiwan', 6.9300, 122.0900),
+('Universidad de Zamboanga Medical Center', 35, 'Tetuan', 6.9260, 122.0830),
+('Labuan General Hospital', 20, 'Calarian', 6.9265, 122.0130);
 
 -- 6. Historical Flood Log (Past Major Flooding Events)
 INSERT INTO flood_history (barangay, date, severity, water_level) VALUES
