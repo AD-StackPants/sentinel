@@ -13,9 +13,47 @@ type ViewMode = 'overview' | 'map' | 'copilot' | 'dispatch';
 const OperationalDashboard: React.FC = () => {
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [activeJobId, setActiveJobId] = useState<string | null>(null);
+    const [approvedActions, setApprovedActions] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('sentinel_approved_actions');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
     const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([
         { timestamp: new Date(), event: 'System Initialized', type: 'system_execution' }
     ]);
+
+    // Fetch approved directives and audit events from backend Snowflake DB on mount
+    useEffect(() => {
+        const fetchInitialAuditData = async () => {
+            try {
+                const [dirRes, evtRes] = await Promise.all([
+                    axios.get(`${API_BASE_URL}/api/v1/audit/approved-directives`),
+                    axios.get(`${API_BASE_URL}/api/v1/audit/events`)
+                ]);
+                if (dirRes.data?.approved_directives && Array.isArray(dirRes.data.approved_directives)) {
+                    setApprovedActions(prev => {
+                        const merged = Array.from(new Set([...prev, ...dirRes.data.approved_directives]));
+                        localStorage.setItem('sentinel_approved_actions', JSON.stringify(merged));
+                        return merged;
+                    });
+                }
+                if (evtRes.data?.events && Array.isArray(evtRes.data.events) && evtRes.data.events.length > 0) {
+                    const dbEvents: AuditEvent[] = evtRes.data.events.map((e: any) => ({
+                        timestamp: new Date(e.timestamp),
+                        event: e.event,
+                        type: e.type as AuditEvent['type']
+                    }));
+                    setAuditEvents(dbEvents);
+                }
+            } catch (err) {
+                console.error("Failed to load audit data from backend", err);
+            }
+        };
+        fetchInitialAuditData();
+    }, []);
 
     // Keyboard shortcuts (1: Overview, 2: Map, 3: Copilot, 4: Dispatch)
     useEffect(() => {
@@ -33,10 +71,25 @@ const OperationalDashboard: React.FC = () => {
     }, []);
 
     const addEvent = (event: string, type: AuditEvent['type']) => {
-        setAuditEvents(prev => [...prev, { timestamp: new Date(), event, type }]);
+        setAuditEvents(prev => [{ timestamp: new Date(), event, type }, ...prev]);
+        // Persist to Snowflake audit_logs
+        axios.post(`${API_BASE_URL}/api/v1/audit/log`, { event, event_type: type }).catch(e => {
+            console.error("Failed to persist audit log", e);
+        });
     };
 
     const handleApproveAction = async (action: string) => {
+        setApprovedActions(prev => {
+            if (prev.includes(action)) return prev;
+            const updated = [...prev, action];
+            try {
+                localStorage.setItem('sentinel_approved_actions', JSON.stringify(updated));
+            } catch (e) {
+                console.error("Failed to save approved action to localStorage", e);
+            }
+            return updated;
+        });
+
         addEvent(`User Approved Directive: ${action}`, 'user_approval');
         addEvent('Queueing Broadcast Job to Notification Engine...', 'system_execution');
 
@@ -136,14 +189,14 @@ const OperationalDashboard: React.FC = () => {
                                 <DisasterMap />
                             </div>
                             <div className="w-1/3 h-full">
-                                <RecommendationPanel onApprove={handleApproveAction} />
+                                <RecommendationPanel onApprove={handleApproveAction} approvedActions={approvedActions} />
                             </div>
                         </div>
 
                         {/* Bottom Row: Chat, Notifications, Audit */}
                         <div className="flex h-2/5 gap-3">
                             <div className="w-1/3 h-full">
-                                <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}/>
+                                <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")} approvedActions={approvedActions} />
                             </div>
                             <div className="w-1/3 h-full">
                                 <NotificationPanel activeJobId={activeJobId} />
@@ -162,7 +215,7 @@ const OperationalDashboard: React.FC = () => {
                             <DisasterMap />
                         </div>
                         <div className="w-1/4 h-full">
-                            <RecommendationPanel onApprove={handleApproveAction} />
+                            <RecommendationPanel onApprove={handleApproveAction} approvedActions={approvedActions} />
                         </div>
                     </div>
                 )}
@@ -171,10 +224,10 @@ const OperationalDashboard: React.FC = () => {
                 {viewMode === 'copilot' && (
                     <div className="flex h-full gap-3 animate-in fade-in duration-200">
                         <div className="w-3/5 h-full">
-                            <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")}/>
+                            <ChatInterface onApproveAction={handleApproveAction} onAiQuery={() => addEvent("AI Risk Assessment Requested", "ai_assessment")} approvedActions={approvedActions} />
                         </div>
                         <div className="w-2/5 h-full">
-                            <RecommendationPanel onApprove={handleApproveAction} />
+                            <RecommendationPanel onApprove={handleApproveAction} approvedActions={approvedActions} />
                         </div>
                     </div>
                 )}

@@ -55,6 +55,12 @@ CREATE OR REPLACE TABLE citizen_contacts (
     barangay STRING
 );
 
+CREATE OR REPLACE TABLE audit_logs (
+    event STRING,
+    event_type STRING,
+    timestamp TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
 -- Optional: Create Job Execution Engine tables in Snowflake if it acts as a data store for the engine.
 CREATE OR REPLACE TABLE execution_jobs (
     job_id STRING PRIMARY KEY,

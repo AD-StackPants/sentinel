@@ -6,9 +6,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 interface ChatInterfaceProps {
     onApproveAction?: (action: string) => void;
     onAiQuery?: () => void;
+    approvedActions?: string[];
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuery }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuery, approvedActions = [] }) => {
   const [messages, setMessages] = useState<{role: string, text: string, recommendations?: string[]}[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -140,15 +141,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onApproveAction, onAiQuer
               <div className="mt-2 border-t border-border/70 pt-1.5">
                 <strong className="text-[10px] uppercase font-bold text-neutral-foreground tracking-wider block mb-1">Directives:</strong>
                 <div className="flex flex-wrap gap-1">
-                  {msg.recommendations.map((rec, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleLocalApprove(rec)}
-                      className="button button-primary button-sm text-[10px] font-semibold px-2 py-0.5 rounded"
-                    >
-                      {rec}
-                    </button>
-                  ))}
+                  {msg.recommendations.map((rec, i) => {
+                    const isApproved = approvedActions.includes(rec);
+                    return isApproved ? (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold flex items-center gap-1"
+                      >
+                        ✓ {rec} (Approved)
+                      </span>
+                    ) : (
+                      <button
+                        key={i}
+                        onClick={() => handleLocalApprove(rec)}
+                        className="button button-primary button-sm text-[10px] font-semibold px-2 py-0.5 rounded"
+                      >
+                        {rec}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

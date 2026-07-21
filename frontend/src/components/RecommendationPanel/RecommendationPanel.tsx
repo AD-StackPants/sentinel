@@ -13,9 +13,10 @@ interface Recommendations {
 
 interface RecommendationPanelProps {
     onApprove: (action: string) => void;
+    approvedActions?: string[];
 }
 
-const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove }) => {
+const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove, approvedActions = [] }) => {
     const [recs, setRecs] = useState<Recommendations | null>(null);
 
     useEffect(() => {
@@ -84,29 +85,53 @@ const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove }) 
             <div className="card-content flex-1 overflow-y-auto pr-1 space-y-1.5">
                 <strong className="text-[10px] text-neutral-foreground uppercase tracking-wider block">Directives:</strong>
                 <div className="flex flex-col gap-1.5">
-                    {recs.recommended_actions.map((action, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-2 bg-neutral/10 hover:bg-neutral/20 border border-border/70 rounded-lg text-xs transition-colors">
-                            <span className="text-foreground font-medium text-xs pr-2">{action}</span>
-                            <button
-                                onClick={() => onApprove(action)}
-                                className="button button-primary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
-                            >
-                                Approve
-                            </button>
-                        </div>
-                    ))}
-                    <div className="flex justify-between items-center p-2 bg-primary/10 hover:bg-primary/15 border border-primary/30 rounded-lg text-xs transition-colors">
-                        <div className="flex flex-col">
-                            <span className="text-foreground font-semibold text-xs">Dispatch Alerts</span>
-                            <span className="text-[10px] text-neutral-foreground font-mono">SMS & Email Broadcast</span>
-                        </div>
-                        <button
-                            onClick={() => onApprove("Dispatch Notifications")}
-                            className="button button-secondary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
-                        >
-                            Approve
-                        </button>
-                    </div>
+                    {recs.recommended_actions.map((action, idx) => {
+                        const isApproved = approvedActions.includes(action);
+                        return (
+                            <div key={idx} className={`flex justify-between items-center p-2 border rounded-lg text-xs transition-colors ${
+                                isApproved ? 'bg-success/10 border-success/30' : 'bg-neutral/10 hover:bg-neutral/20 border-border/70'
+                            }`}>
+                                <span className="text-foreground font-medium text-xs pr-2">{action}</span>
+                                {isApproved ? (
+                                    <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                                        ✓ Approved
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => onApprove(action)}
+                                        className="button button-primary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
+                                    >
+                                        Approve
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {(() => {
+                        const isDispatchApproved = approvedActions.includes("Dispatch Notifications");
+                        return (
+                            <div className={`flex justify-between items-center p-2 border rounded-lg text-xs transition-colors ${
+                                isDispatchApproved ? 'bg-success/10 border-success/30' : 'bg-primary/10 hover:bg-primary/15 border-primary/30'
+                            }`}>
+                                <div className="flex flex-col">
+                                    <span className="text-foreground font-semibold text-xs">Dispatch Alerts</span>
+                                    <span className="text-[10px] text-neutral-foreground font-mono">SMS & Email Broadcast</span>
+                                </div>
+                                {isDispatchApproved ? (
+                                    <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                                        ✓ Approved
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => onApprove("Dispatch Notifications")}
+                                        className="button button-secondary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
+                                    >
+                                        Approve
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
         </div>
