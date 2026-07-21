@@ -1,33 +1,81 @@
-INFO:     Started server process [101486]
+INFO:     Will watch for changes in these directories: ['/app/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [123230] using WatchFiles
+2026-07-21 09:56:52 [error    ] job_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [c5af4249-ce6c-4ed2-b1a5-5317366c10a4]'
+INFO:     Started server process [123234]
 INFO:     Waiting for application startup.
+INFO:     Telemetry streaming started.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:38596 - "HEAD /health HTTP/1.1" 405 Method Not Allowed
-INFO:     127.0.0.1:35602 - "GET /api/v1/map/data HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35608 - "GET /api/v1/map/data HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35608 - "OPTIONS /api/v1/copilot/ask HTTP/1.1" 200 OK
-2026-07-21 05:31:59 [warning  ] using_placeholder_snowflake_credentials_skipping_connection
-2026-07-21 05:31:59 [info     ] processing_copilot_query       context=None query='What is the flood risk in Cagayan de Oro?'
-INFO:     127.0.0.1:35602 - "POST /api/v1/copilot/ask HTTP/1.1" 200 OK
-INFO:     127.0.0.1:35602 - "OPTIONS /api/v1/jobs/ HTTP/1.1" 200 OK
-2026-07-21 05:32:02 [info     ] job_created                    channels=['sms', 'email'] filter=high_risk_zones job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
-INFO:     127.0.0.1:35608 - "POST /api/v1/jobs/ HTTP/1.1" 200 OK
-2026-07-21 05:32:04 [info     ] job_processing_started         job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
-2026-07-21 05:32:04 [info     ] dispatching_sms                target=high_risk_zones
-2026-07-21 05:32:04 [info     ] dispatching_email              target=high_risk_zones
-2026-07-21 05:32:04 [info     ] job_completed                  job_id=a4d1239a-ef22-462d-9373-5a3db6c96de2
-INFO:     127.0.0.1:35608 - "GET /api/v1/jobs/a4d1239a-ef22-462d-9373-5a3db6c96de2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:37646 - "GET /api/v1/map/data HTTP/1.1" 200 OK
-INFO:     127.0.0.1:37658 - "GET /api/v1/map/data HTTP/1.1" 200 OK
-INFO:     127.0.0.1:37658 - "OPTIONS /api/v1/copilot/ask HTTP/1.1" 200 OK
-2026-07-21 05:33:53 [warning  ] using_placeholder_snowflake_credentials_skipping_connection
-2026-07-21 05:33:53 [info     ] processing_copilot_query       context=None query='What is the flood risk in Cagayan de Oro?'
-INFO:     127.0.0.1:37646 - "POST /api/v1/copilot/ask HTTP/1.1" 200 OK
-INFO:     127.0.0.1:37646 - "OPTIONS /api/v1/jobs/ HTTP/1.1" 200 OK
-2026-07-21 05:33:56 [info     ] job_created                    channels=['sms', 'email'] filter=high_risk_zones job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
-INFO:     127.0.0.1:37658 - "POST /api/v1/jobs/ HTTP/1.1" 200 OK
-2026-07-21 05:33:57 [info     ] job_processing_started         job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
-2026-07-21 05:33:57 [info     ] dispatching_sms                target=high_risk_zones
-2026-07-21 05:33:57 [info     ] dispatching_email              target=high_risk_zones
-2026-07-21 05:33:57 [info     ] job_completed                  job_id=d5b5c8a4-eb9b-40f2-b5d6-77121663d06b
-INFO:     127.0.0.1:37658 - "GET /api/v1/jobs/d5b5c8a4-eb9b-40f2-b5d6-77121663d06b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33580 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 1
+INFO:     WebSocket disconnected. Total connections: 0
+INFO:     127.0.0.1:33620 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 1
+INFO:     127.0.0.1:33636 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 2
+INFO:     WebSocket disconnected. Total connections: 1
+INFO:     127.0.0.1:33596 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33652 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 2
+INFO:     127.0.0.1:33640 - "GET /api/v1/map/data HTTP/1.1" 200 OK
+2026-07-21 09:58:47 [error    ] snowflake_connection_failed    error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [f285752c-aec7-49e3-9a97-97ba5948ced3]'
+INFO:     127.0.0.1:33612 - "GET /api/v1/copilot/recommendations HTTP/1.1" 200 OK
+2026-07-21 09:58:50 [error    ] snowflake_connection_failed    error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [d50b148a-09e7-42a5-8d8a-fbe3c5dd7766]'
+INFO:     127.0.0.1:33640 - "GET /api/v1/copilot/recommendations HTTP/1.1" 200 OK
+INFO:     WebSocket disconnected. Total connections: 1
+INFO:     WebSocket disconnected. Total connections: 0
+INFO:     127.0.0.1:33662 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 1
+INFO:     WebSocket disconnected. Total connections: 0
+INFO:     127.0.0.1:33678 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 1
+INFO:     127.0.0.1:40078 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 2
+INFO:     127.0.0.1:40082 - "WebSocket /api/v1/ws/telemetry" [accepted]
+INFO:     connection open
+INFO:     WebSocket connected. Total connections: 3
+INFO:     WebSocket disconnected. Total connections: 2
+INFO:     WebSocket disconnected. Total connections: 1
+INFO:     WebSocket disconnected. Total connections: 0
+WARNING:  WatchFiles detected changes in 'app/services/copilot_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Telemetry streaming stopped.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [123234]
+WARNING:  WatchFiles detected changes in 'app/api/jobs.py'. Reloading...
+2026-07-21 10:02:29 [error    ] job_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [beeed07a-ba74-4e51-90f9-a7e811a19e32]'
+INFO:     Started server process [175750]
+INFO:     Waiting for application startup.
+INFO:     Telemetry streaming started.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Telemetry streaming stopped.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [175750]
+2026-07-21 10:02:32 [error    ] audit_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [80019108-741a-44d8-b537-975f08b0139a]'
+2026-07-21 10:02:34 [error    ] job_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access.'
+INFO:     Started server process [176865]
+INFO:     Waiting for application startup.
+INFO:     Telemetry streaming started.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/copilot.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Telemetry streaming stopped.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [176865]
+2026-07-21 10:02:43 [error    ] audit_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access. [83971333-5ddf-4d19-9951-f3376c627395]'
+2026-07-21 10:02:45 [error    ] job_snowflake_connection_failed error='250001 (08001): Failed to connect to DB: KHDQMUR-QE72878.snowflakecomputing.com:443. Incoming request with IP/Token 34.28.228.31 is not allowed to access Snowflake. Contact your account administrator. For more information about this error, go to https://community.snowflake.com/s/ip-xxxxxxxxxxxx-is-not-allowed-to-access.'
+INFO:     Started server process [177550]
+INFO:     Waiting for application startup.
+INFO:     Telemetry streaming started.
+INFO:     Application startup complete.

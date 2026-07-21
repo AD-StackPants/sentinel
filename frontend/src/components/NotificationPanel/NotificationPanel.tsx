@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { useTelemetryWebSocket } from '../../hooks/useTelemetryWebSocket';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -15,13 +16,13 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ activeJobId }) =>
     const [copied, setCopied] = useState<boolean>(false);
     const [isLargeFont, setIsLargeFont] = useState<boolean>(false);
     const consoleEndRef = useRef<HTMLDivElement>(null);
+    const { telemetry } = useTelemetryWebSocket();
 
     useEffect(() => {
         if (!activeJobId) return;
 
-        setStatus('polling');
-
-        const interval = setInterval(async () => {
+        // Initial fetch
+        const fetchInitialState = async () => {
             try {
                 const res = await axios.get(`${API_BASE_URL}/api/v1/jobs/${activeJobId}`);
                 setStatus(res.data.status);
@@ -29,18 +30,23 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ activeJobId }) =>
                 if (res.data.counts) {
                     setCounts(res.data.counts);
                 }
-
-                if (res.data.status === 'completed' || res.data.status === 'error') {
-                    clearInterval(interval);
-                }
             } catch (e) {
-                console.error("Failed to poll job status", e);
-                clearInterval(interval);
+                console.error("Failed to fetch job status", e);
             }
-        }, 350);
-
-        return () => clearInterval(interval);
+        }
+        fetchInitialState();
     }, [activeJobId]);
+
+    // Listen to WebSocket for log updates
+    useEffect(() => {
+        if (telemetry && telemetry.type === 'job_log_update' && telemetry.job_id === activeJobId) {
+            setStatus(telemetry.status);
+            setLogs(prev => [...prev, telemetry.log]);
+            if (telemetry.counts) {
+                setCounts(telemetry.counts);
+            }
+        }
+    }, [telemetry, activeJobId]);
 
     useEffect(() => {
         consoleEndRef.current?.scrollIntoView({ behavior: 'smooth' });

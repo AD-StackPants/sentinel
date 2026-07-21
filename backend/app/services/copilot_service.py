@@ -43,19 +43,50 @@ class CopilotService:
         if self.conn:
             try:
                 cursor = self.conn.cursor()
+
+                # Ground LLM reasoning in official response protocols via RAG
+                import json
+                search_config = {
+                    "query": query,
+                    "columns": ["content"]
+                }
+                rag_sql = """
+                    SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                        'SENTINEL_SOP_SEARCH_SERVICE',
+                        %s
+                    )
+                """
+                cursor.execute(rag_sql, (json.dumps(search_config),))
+                rag_result = cursor.fetchone()
+
+                context_str = ""
+                if rag_result and len(rag_result) > 0 and rag_result[0]:
+                    try:
+                        import json
+                        results_json = json.loads(str(rag_result[0]))
+                        if 'results' in results_json:
+                            context_str = " ".join([r.get('content', '') for r in results_json['results']])
+                    except Exception as parse_e:
+                        logger.warning("failed_to_parse_cortex_search_preview", error=str(parse_e))
+
+                # Append context to query if found
+                final_prompt = query
+                if context_str:
+                    final_prompt = f"Context from SOP: {context_str}\n\nQuestion: {query}"
+
                 sql = f"""
                     SELECT SNOWFLAKE.CORTEX.COMPLETE(
                         '{settings.SNOWFLAKE_CORTEX_MODEL}',
                         %s
                     )
                 """
-                cursor.execute(sql, (query,))
+                cursor.execute(sql, (final_prompt,))
                 result = cursor.fetchone()
                 logger.info("cortex_execution_successful", result=result)
                 if result and len(result) > 0 and result[0]:
                     return {
                         "response": str(result[0]),
-                        "explanation": f"Generated live using Snowflake Cortex ({settings.SNOWFLAKE_CORTEX_MODEL}) against active Sentinel AI database.",
+                        "explanation": f"Generated live using Snowflake Cortex ({settings.SNOWFLAKE_CORTEX_MODEL}) against active Sentinel AI database, grounded with SOP Search.",
                         "recommended_actions": ["Issue Evacuation Advisory", "Dispatch Emergency Notifications"]
                     }
 
