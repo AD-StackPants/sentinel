@@ -11,7 +11,7 @@ def test_health_check():
 def test_ask_copilot():
     response = client.post(
         "/api/v1/copilot/ask",
-        json={"query": "Test query"}
+        json={"query": "What is the flood risk?"}
     )
     assert response.status_code == 200
-    assert "Test query" in response.json()["response"]
+    assert "flood" in response.json()["response"].lower()

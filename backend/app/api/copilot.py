@@ -1,7 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from app.services.copilot_service import CopilotService
 
 router = APIRouter()
+
+# Dependency injection for the service
+def get_copilot_service():
+    return CopilotService()
 
 class CopilotQuery(BaseModel):
     query: str
@@ -13,10 +18,10 @@ class CopilotResponse(BaseModel):
     recommended_actions: list[str] | None = None
 
 @router.post("/ask", response_model=CopilotResponse)
-def ask_copilot(query: CopilotQuery):
-    # Skeleton implementation for interacting with CoCo CLI/Snowflake
+def ask_copilot(query: CopilotQuery, service: CopilotService = Depends(get_copilot_service)):
+    result = service.process_query(query.query, query.context)
     return CopilotResponse(
-        response=f"Received query: {query.query}",
-        explanation="This is a skeleton response.",
-        recommended_actions=["Review data", "Approve recommendations"]
+        response=result.get("response", ""),
+        explanation=result.get("explanation"),
+        recommended_actions=result.get("recommended_actions")
     )
