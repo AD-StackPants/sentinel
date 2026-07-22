@@ -30,16 +30,24 @@ class CopilotService:
             logger.error("snowflake_connection_failed", error=str(e))
             self.conn = None
 
+    def _get_connection(self):
+        if self.conn:
+            try:
+                if not self.conn.is_closed():
+                    return self.conn
+            except Exception:
+                self.conn = None
+        self._connect_to_snowflake()
+        return self.conn
+
     def process_query(self, query: str, context: dict | None = None) -> dict:
         logger.info("processing_copilot_query", query=query, context=context)
 
-        if not self.conn:
-            self._connect_to_snowflake()
-
-        if not self.conn:
+        conn = self._get_connection()
+        if not conn:
             raise RuntimeError("Snowflake database connection is unavailable.")
 
-        cursor = self.conn.cursor()
+        cursor = conn.cursor()
         context_str = ""
         try:
             search_config = {"query": query, "columns": ["content"]}
@@ -88,6 +96,11 @@ class CopilotService:
             explanation += " Grounded with SOP Search."
 
         response_text = str(result[0]) if result and len(result) > 0 and result[0] else ""
+        if response_text.startswith('"') and response_text.endswith('"'):
+            try:
+                response_text = json.loads(response_text)
+            except Exception:
+                response_text = response_text[1:-1]
 
         return {
             "response": response_text,
@@ -100,13 +113,11 @@ class CopilotService:
 
     def get_recommendations(self) -> dict:
         """Provides dynamic Cortex AI recommendations query based on live Snowflake telemetry."""
-        if not self.conn:
-            self._connect_to_snowflake()
-
-        if not self.conn:
+        conn = self._get_connection()
+        if not conn:
             raise RuntimeError("Snowflake database connection is unavailable.")
 
-        cursor = self.conn.cursor()
+        cursor = conn.cursor()
 
         # 1. Fetch live telemetry metrics from Snowflake tables
         cursor.execute("""
@@ -147,9 +158,19 @@ class CopilotService:
 
         if cortex_res and cortex_res[0]:
             raw_text = str(cortex_res[0])
+            # If Cortex returned a double-stringified string literal, decode it first
+            if raw_text.startswith('"') and raw_text.endswith('"'):
+                try:
+                    raw_text = json.loads(raw_text)
+                except Exception:
+                    pass
             json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
+                try:
+                    cleaned_json = json_match.group().strip()
+                    return json.loads(cleaned_json)
+                except Exception as json_err:
+                    logger.warning("cortex_json_parse_error_using_calculated_fallback", error=str(json_err), raw=raw_text)
 
         return {
             "risk_level": "Orange Alert" if highest_water_level >= 8.0 else "Yellow Alert",
