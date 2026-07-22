@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services.copilot_service import CopilotService
 
@@ -12,8 +12,8 @@ def get_copilot_service():
 
 
 class CopilotQuery(BaseModel):
-    query: str
-    session_id: str = "default_session"
+    query: str = Field(..., max_length=500, description="User prompt query (max 500 characters)")
+    session_id: str = Field("default_session", max_length=100)
     context: dict | None = None
 
 
