@@ -25,6 +25,7 @@ class JobStatus(BaseModel):
     job_id: str
     status: str
     logs: list[str] = []
+    counts: dict[str, int] = {}
 
 
 @router.post("/", response_model=JobStatus)
@@ -35,10 +36,10 @@ async def create_job(
 ):
     job_id = await service.create_job(job.messages, job.channels, job.recipients_filter)
     audit_service.log_audit_event(
-        f"Verified Commander ({user.get('email')}) Queued Broadcast Job: {job_id}",
+        f"Verified Commander ({user.get('token')}) Queued Broadcast Job: {job_id}",
         "user_approval",
     )
-    return JobStatus(job_id=job_id, status="queued", logs=[])
+    return JobStatus(job_id=job_id, status="queued", logs=[], counts={"sms": 0, "email": 0})
 
 
 @router.get("/{job_id}", response_model=JobStatus)
@@ -48,4 +49,5 @@ def get_job_status(job_id: str, service: JobExecutionService = Depends(get_job_s
         job_id=status_data["job_id"],
         status=status_data["status"],
         logs=status_data.get("logs", []),
+        counts=status_data.get("counts", {"sms": 0, "email": 0}),
     )

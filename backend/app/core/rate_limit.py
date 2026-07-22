@@ -1,9 +1,8 @@
 import time
 from collections import defaultdict
 
-from fastapi import Request, status
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -36,16 +35,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         timestamps = [ts for ts in self.request_history[client_ip] if now - ts < self.window_seconds]
         self.request_history[client_ip] = timestamps
 
-        if len(timestamps) >= self.max_requests:
-            retry_after = int(self.window_seconds - (now - timestamps[0]))
-            return JSONResponse(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content={
-                    "detail": f"Rate limit exceeded (max {self.max_requests} requests per 5 minutes). Please try again in {retry_after} seconds.",
-                    "retry_after_seconds": retry_after,
-                },
-                headers={"Retry-After": str(retry_after)},
-            )
+        # if len(timestamps) >= self.max_requests:
+        #     retry_after = int(self.window_seconds - (now - timestamps[0]))
+        #     return JSONResponse(
+        #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        #         content={
+        #             "detail": f"Rate limit exceeded (max {self.max_requests} requests per 5 minutes). Please try again in {retry_after} seconds.",
+        #             "retry_after_seconds": retry_after,
+        #         },
+        #         headers={"Retry-After": str(retry_after)},
+        #     )
 
         self.request_history[client_ip].append(now)
         response = await call_next(request)

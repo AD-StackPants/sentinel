@@ -5,6 +5,7 @@ import RecommendationPanel from '../RecommendationPanel/RecommendationPanel';
 import NotificationPanel from '../NotificationPanel/NotificationPanel';
 import AuditTimeline, { type AuditEvent } from '../AuditTimeline/AuditTimeline';
 import axios from 'axios';
+import { getAuthHeader } from '../../firebase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -32,10 +33,11 @@ const OperationalDashboard: React.FC = () => {
     useEffect(() => {
         const fetchInitialAuditData = async () => {
             try {
+                const headers = await getAuthHeader();
                 const [dirRes, evtRes, chatRes] = await Promise.all([
-                    axios.get(`${API_BASE_URL}/api/v1/audit/approved-directives`),
-                    axios.get(`${API_BASE_URL}/api/v1/audit/events`),
-                    axios.get(`${API_BASE_URL}/api/v1/copilot/history?session_id=default_session`)
+                    axios.get(`${API_BASE_URL}/api/v1/audit/approved-directives`, { headers }),
+                    axios.get(`${API_BASE_URL}/api/v1/audit/events`, { headers }),
+                    axios.get(`${API_BASE_URL}/api/v1/copilot/history?session_id=default_session`, { headers })
                 ]);
                 if (dirRes.data?.approved_directives && Array.isArray(dirRes.data.approved_directives)) {
                     setApprovedActions(prev => {
@@ -83,10 +85,11 @@ const OperationalDashboard: React.FC = () => {
         setIsChatLoading(true);
 
         try {
+            const headers = await getAuthHeader();
             const response = await axios.post(`${API_BASE_URL}/api/v1/copilot/ask`, {
                 query: queryText,
                 session_id: 'default_session'
-            });
+            }, { headers });
 
             const aiResponse = response.data;
             let fullText = aiResponse.response;
@@ -122,12 +125,15 @@ const OperationalDashboard: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    const addEvent = (event: string, type: AuditEvent['type']) => {
+    const addEvent = async (event: string, type: AuditEvent['type']) => {
         setAuditEvents(prev => [{ timestamp: new Date(), event, type }, ...prev]);
         // Persist to Snowflake audit_logs
-        axios.post(`${API_BASE_URL}/api/v1/audit/log`, { event, event_type: type }).catch(e => {
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API_BASE_URL}/api/v1/audit/log`, { event, event_type: type }, { headers });
+        } catch (e) {
             console.error("Failed to persist audit log", e);
-        });
+        }
     };
 
     const handleApproveAction = async (action: string) => {
@@ -146,12 +152,17 @@ const OperationalDashboard: React.FC = () => {
         addEvent('Queueing Broadcast Job to Notification Engine...', 'system_execution');
 
         try {
-            const jobRes = await axios.post(`${API_BASE_URL}/api/v1/jobs/`, {
-                messages: [`EMERGENCY ADVISORY (ZAMBOANGA): ${action}. Proceed to safety centers immediately.`],
-                channels: ["sms", "email"],
-                recipients_filter: "tumaga_stamaria_tetuan"
-            });
-            
+            const headers = await getAuthHeader();
+            const jobRes = await axios.post(
+                `${API_BASE_URL}/api/v1/jobs/`,
+                {
+                    messages: [`EMERGENCY ADVISORY (ZAMBOANGA): ${action}. Proceed to safety centers immediately.`],
+                    channels: ["sms", "email"],
+                    recipients_filter: "tumaga_stamaria_tetuan"
+                },
+                { headers }
+            );
+
             const newJobId = jobRes.data.job_id;
             setActiveJobId(newJobId);
             addEvent(`Job ${newJobId.substring(0, 8)} Dispatch Active`, 'system_execution');
