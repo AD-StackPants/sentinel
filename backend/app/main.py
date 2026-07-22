@@ -35,6 +35,6 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/health")
+@app.get("/healthz")
 def health_check():
     return {"status": "ok", "message": "Sentinel AI Backend is running."}
