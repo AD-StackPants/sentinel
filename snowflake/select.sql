@@ -148,160 +148,23 @@ SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
 );
 
 -- ============================================================
--- SentinelAI Cortex Agent — Optimized AGENT_RUN Queries
+-- 10. Snowflake Cortex Agent — Sample AGENT_RUN Query
 -- ============================================================
--- OPTIMIZATION NOTES:
---   • Session variables ($TOOLS_BOTH, $TOOL_RESOURCES, etc.) eliminate config repetition
---   • Queries that don't need SOP lookup use TOOLS_DATA_ONLY (saves ~5-15s per call)
---   • Sample 7 (incident brief) split into focused sub-queries for parallelism
+-- ARCHITECTURAL NOTE:
+--   • Production Web/Copilot UI & Dispatch Engine use SNOWFLAKE.CORTEX.AI_COMPLETE
+--     + Cortex Search RAG & direct SQL for 1–3s instant response times and human-in-the-loop safety.
+--   • SNOWFLAKE.CORTEX.AGENT_RUN is kept below as a 1-query reference sample for testing
+--     autonomous multi-tool reasoning (SOP search + Text-to-SQL).
 
--- ────────────────────────────────────────────────────────────
--- Sample 1: Inline Telemetry Evaluation
--- Tools used: sop_search + sentinel_data (needs SOP thresholds)
--- ────────────────────────────────────────────────────────────
+-- Sample AGENT_RUN Reference Query:
 SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
     '{
       "agent": "SentinelAI",
       "tools": ' || $TOOLS_BOTH || ',
       "tool_resources": ' || $TOOL_RESOURCES || ',
       "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Assess flood risk for Tumaga river level 8.8m and rainfall 175mm against SOP thresholds."}]}]
+        "text": "What is the current water level and flood risk status for all monitored rivers from the latest sensor readings? Cross-reference with SOP thresholds."}]}]
     }',
     FALSE
-) AS s1_inline_telemetry;
+) AS sample_agent_run;
 
--- ────────────────────────────────────────────────────────────
--- Sample 2: Live Sensor Dashboard
--- Tools used: sentinel_data only
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_DATA_ONLY || ',
-      "tool_resources": ' || $TOOL_RESOURCES_DATA_ONLY || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "What is the current water level and flood risk status for all monitored rivers from the latest sensor readings?"}]}]
-    }',
-    FALSE
-) AS s2_live_sensor_dashboard;
-
--- ────────────────────────────────────────────────────────────
--- Sample 3: Evacuation Center Capacity Planning
--- Tools used: sentinel_data only
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_DATA_ONLY || ',
-      "tool_resources": ' || $TOOL_RESOURCES_DATA_ONLY || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Which evacuation centers have available capacity? Rank by remaining slots and show which are nearest to barangays under RED or ORANGE ALERT."}]}]
-    }',
-    FALSE
-) AS s3_evacuation_capacity;
-
--- ────────────────────────────────────────────────────────────
--- Sample 4: Tactical Resource Deployment Prescription
--- Tools used: sop_search + sentinel_data (SOP defines resource ratios)
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_BOTH || ',
-      "tool_resources": ' || $TOOL_RESOURCES || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Based on current alert levels and affected populations, what is the minimum rescue teams, boats, and medical units needed per SOP guidelines?"}]}]
-    }',
-    FALSE
-) AS s4_resource_deployment;
-
--- ────────────────────────────────────────────────────────────
--- Sample 5: SMS & Email Alert Generation
--- Tools used: sop_search + sentinel_data
---   sop_search: SOP-ALERT-03 defines SMS format (<160 chars) and email
---               broadcast protocol — required for protocol-compliant output
---   sentinel_data: retrieves evacuation center names from DB
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_BOTH || ',
-      "tool_resources": ' || $TOOL_RESOURCES || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Generate an SMS alert (under 160 chars) and a formal email advisory for Tumaga RED ALERT evacuation. Include evacuation center names and CDRRMO hotline."}]}]
-    }',
-    FALSE
-) AS s5_alert_generation;
-
--- ────────────────────────────────────────────────────────────
--- Sample 6: Population Impact Assessment
--- Tools used: sentinel_data only (population data is in DB)
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_DATA_ONLY || ',
-      "tool_resources": ' || $TOOL_RESOURCES_DATA_ONLY || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "How many residents are at risk in RED and ORANGE ALERT barangays? Break down total population per barangay."}]}]
-    }',
-    FALSE
-) AS s6_population_impact;
-
--- ────────────────────────────────────────────────────────────
--- Sample 7: Full Incident Brief (split into 3 focused sub-queries)
--- The original 6-part compound prompt forced many sequential tool calls
--- inside a single agent turn. Splitting reduces latency and allows each
--- sub-query to be run independently or in parallel.
--- ────────────────────────────────────────────────────────────
-
--- 7a: Situation Awareness — alert levels, populations, shelter capacity
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_DATA_ONLY || ',
-      "tool_resources": ' || $TOOL_RESOURCES_DATA_ONLY || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "List all barangays under RED or ORANGE ALERT with current water levels, affected population, and available evacuation center capacity."}]}]
-    }',
-    FALSE
-) AS s7a_situation_awareness;
-
--- 7b: Resource Prescription — rescue teams & boats per SOP ratios (requires sop_search)
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_BOTH || ',
-      "tool_resources": ' || $TOOL_RESOURCES || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Per SOP guidelines, prescribe rescue teams and boats needed for current RED/ORANGE ALERT barangays. Include hospital bed availability."}]}]
-    }',
-    FALSE
-) AS s7b_resource_prescription;
-
--- 7c: Communications — SMS broadcast draft for RED ALERT barangays
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_DATA_ONLY || ',
-      "tool_resources": ' || $TOOL_RESOURCES_DATA_ONLY || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Draft an SMS broadcast (under 160 chars) for all RED ALERT barangays with evacuation instructions."}]}]
-    }',
-    FALSE
-) AS s7c_sms_broadcast;
-
--- ────────────────────────────────────────────────────────────
--- Sample 8: Healthcare & Hospital Surge Coordination
--- Tools used: sop_search + sentinel_data (SOP defines pre-positioning rules)
--- ────────────────────────────────────────────────────────────
-SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{
-      "agent": "SentinelAI",
-      "tools": ' || $TOOLS_BOTH || ',
-      "tool_resources": ' || $TOOL_RESOURCES || ',
-      "messages": [{"role": "user", "content": [{"type": "text",
-        "text": "Rank hospitals by available beds. Which are closest to Tumaga, Sta. Maria, Tugbungan? How should medical resources be pre-positioned per SOP?"}]}]
-    }',
-    FALSE
-) AS s8_hospital_surge;

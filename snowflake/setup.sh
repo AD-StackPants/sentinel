@@ -22,7 +22,7 @@ SQL_FILES=(
     "setup_2_seed.sql"
     "setup_3_cortex_search.sql"
     "setup_4_semantic_view.sql"
-    "setup_5_cortex_agent.sql"
+    # "setup_5_cortex_agent.sql"  # Optional: Uncomment if deploying autonomous Cortex Agent object
 )
 
 echo "🚀 Executing Snowflake SQL setup scripts sequentially using Snowflake CLI ('snow sql')..."
