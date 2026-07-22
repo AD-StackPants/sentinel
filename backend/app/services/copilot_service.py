@@ -47,8 +47,6 @@ class CopilotService:
                 # Ground LLM reasoning in official response protocols via RAG (if available)
                 context_str = ""
                 try:
-                    import json
-
                     search_config = {"query": query, "columns": ["content"]}
                     rag_sql = """
                         SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
@@ -69,11 +67,10 @@ class CopilotService:
                     logger.warning("cortex_search_preview_unavailable", error=str(rag_e))
 
                 # Append context to query if found
-                final_prompt = query
                 if context_str:
                     final_prompt = f"Context from SOP: {context_str}\n\nQuestion: {query}"
                 else:
-                    final_prompt = f"You are an Emergency Operations AI Copilot for Zamboanga City. Answer concisely based on current telemetry.\nQuestion: {query}"
+                    final_prompt = f"You are an Emergency Operations AI Copilot for {settings.DEFAULT_JURISDICTION_CITY}. Answer concisely based on current telemetry.\nQuestion: {query}"
 
                 sql = f"""
                     SELECT SNOWFLAKE.CORTEX.COMPLETE(
@@ -109,11 +106,13 @@ class CopilotService:
     def _fallback_mock_response(self, query: str) -> dict:
         """Provides a realistic mock response for local offline development."""
         query_lower = query.lower()
+        city = settings.DEFAULT_JURISDICTION_CITY
+        region = settings.DEFAULT_JURISDICTION_REGION
 
         if "flood risk" in query_lower or "greatest" in query_lower:
             return {
-                "response": "Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in Zamboanga City are Barangay Tumaga, Barangay Sta. Maria, and Barangay Tetuan.",
-                "explanation": "Rainfall in the Zamboanga Peninsula has reached 175mm in the last 12 hours. Sensor ZAM-TUMAGA-01 on the Tumaga River reports a water level of 8.8m, which exceeds the Critical Threshold. The probability of severe flooding is high.",
+                "response": f"Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in {city} are Barangay Tumaga, Barangay Sta. Maria, and Barangay Tetuan.",
+                "explanation": f"Rainfall in {region} has reached 175mm in the last 12 hours. Sensor ZAM-TUMAGA-01 on the Tumaga River reports a water level of 8.8m, which exceeds the Critical Threshold. The probability of severe flooding is high.",
                 "recommended_actions": [
                     "Issue Orange Alert",
                     "Deploy Rescue Teams",
@@ -141,7 +140,7 @@ class CopilotService:
             }
         else:
             return {
-                "response": "I am monitoring the situation. Current weather feeds indicate 'Typhoon Approaching' with 175mm rainfall recorded in the Zamboanga Peninsula.",
+                "response": f"I am monitoring the situation. Current weather feeds indicate 'Typhoon Approaching' with 175mm rainfall recorded in {region}.",
                 "explanation": "Tumaga River is currently at critical levels (8.8m). Please ask about flood risk or recommendations for detailed actions.",
                 "recommended_actions": ["Assess Flood Risk", "Review Resources"],
             }
@@ -170,7 +169,7 @@ class CopilotService:
 
                     prompt = f"""
                     You are an Emergency Operations AI Copilot.
-                    Analyze current disaster telemetry for Zamboanga City:
+                    Analyze current disaster telemetry for {settings.DEFAULT_JURISDICTION_CITY} ({settings.DEFAULT_JURISDICTION_REGION}):
                     - Storm: {rows[0][4]} ({rows[0][3]}mm rainfall)
                     - Highest River Sensor Water Level: {highest_water_level}m
                     - High Risk Barangays: {", ".join(high_risk_barangays)}
