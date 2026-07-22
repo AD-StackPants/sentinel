@@ -11,223 +11,155 @@ logger = structlog.get_logger()
 
 class CopilotService:
     def __init__(self):
-        # We initialize the connection logic but handle errors gracefully
-        # so the app doesn't crash if credentials are placeholders.
         self.conn = None
         self._connect_to_snowflake()
 
     def _connect_to_snowflake(self):
         try:
-            # Only attempt connection if it looks like a real account might be configured
-            if settings.SNOWFLAKE_ACCOUNT != "placeholder_account":
-                self.conn = snowflake.connector.connect(
-                    user=settings.SNOWFLAKE_USER,
-                    password=settings.SNOWFLAKE_PASSWORD,
-                    account=settings.SNOWFLAKE_ACCOUNT,
-                    warehouse=settings.SNOWFLAKE_WAREHOUSE,
-                    database=settings.SNOWFLAKE_DATABASE,
-                    schema=settings.SNOWFLAKE_SCHEMA,
-                    role=settings.SNOWFLAKE_ROLE,
-                )
-                logger.info("connected_to_snowflake")
-            else:
-                logger.warning("using_placeholder_snowflake_credentials_skipping_connection")
+            self.conn = snowflake.connector.connect(
+                user=settings.SNOWFLAKE_USER,
+                password=settings.SNOWFLAKE_PASSWORD,
+                account=settings.SNOWFLAKE_ACCOUNT,
+                warehouse=settings.SNOWFLAKE_WAREHOUSE,
+                database=settings.SNOWFLAKE_DATABASE,
+                schema=settings.SNOWFLAKE_SCHEMA,
+                role=settings.SNOWFLAKE_ROLE,
+            )
+            logger.info("connected_to_snowflake")
         except Exception as e:
             logger.error("snowflake_connection_failed", error=str(e))
+            self.conn = None
 
     def process_query(self, query: str, context: dict | None = None) -> dict:
         logger.info("processing_copilot_query", query=query, context=context)
 
-        # ---------------------------------------------------------
-        # PRODUCTION IMPLEMENTATION (Snowflake Cortex / CoCo CLI)
-        # ---------------------------------------------------------
-        if self.conn:
-            try:
-                cursor = self.conn.cursor()
-                # Ground LLM reasoning in official response protocols via RAG (if available)
-                context_str = ""
-                try:
-                    search_config = {"query": query, "columns": ["content"]}
-                    rag_sql = """
-                        SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-                            'SENTINEL_SOP_SEARCH_SERVICE',
-                            %s
-                        )
-                    """
-                    cursor.execute(rag_sql, (json.dumps(search_config),))
-                    rag_result = cursor.fetchone()
+        if not self.conn:
+            self._connect_to_snowflake()
 
-                    if rag_result and len(rag_result) > 0 and rag_result[0]:
-                        results_json = json.loads(str(rag_result[0]))
-                        if "results" in results_json:
-                            context_str = " ".join(
-                                [r.get("content", "") for r in results_json["results"]]
-                            )
-                except Exception as rag_e:
-                    logger.warning("cortex_search_preview_unavailable", error=str(rag_e))
+        if not self.conn:
+            raise RuntimeError("Snowflake database connection is unavailable.")
 
-                location_context = (
-                    f"{settings.DEFAULT_JURISDICTION_CITY}, {settings.DEFAULT_JURISDICTION_REGION}"
+        cursor = self.conn.cursor()
+        context_str = ""
+        try:
+            search_config = {"query": query, "columns": ["content"]}
+            rag_sql = """
+                SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                    'SENTINEL_SOP_SEARCH_SERVICE',
+                    %s
                 )
+            """
+            cursor.execute(rag_sql, (json.dumps(search_config),))
+            rag_result = cursor.fetchone()
 
-                if context_str:
-                    final_prompt = (
-                        f"Target Jurisdiction: {location_context}\n"
-                        f"Context from SOP: {context_str}\n\n"
-                        f"Question: {query}"
+            if rag_result and len(rag_result) > 0 and rag_result[0]:
+                results_json = json.loads(str(rag_result[0]))
+                if "results" in results_json:
+                    context_str = " ".join(
+                        [r.get("content", "") for r in results_json["results"]]
                     )
-                else:
-                    final_prompt = (
-                        f"Target Jurisdiction: {location_context}\n"
-                        f"Answer concisely based on current telemetry.\n\n"
-                        f"Question: {query}"
-                    )
+        except Exception as rag_e:
+            logger.warning("cortex_search_preview_unavailable", error=str(rag_e))
 
-                sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
-                cursor.execute(sql, (final_prompt,))
-                result = cursor.fetchone()
-                logger.info("cortex_execution_successful", result=result)
-                if result and len(result) > 0 and result[0]:
-                    explanation = f"Generated live using Snowflake Cortex ({settings.SNOWFLAKE_CORTEX_MODEL}) against active Sentinel AI database."
-                    if context_str:
-                        explanation += " Grounded with SOP Search."
-                    return {
-                        "response": str(result[0]),
-                        "explanation": explanation,
-                        "recommended_actions": [
-                            "Issue Evacuation Advisory",
-                            "Dispatch Emergency Notifications",
-                        ],
-                    }
+        location_context = (
+            f"{settings.DEFAULT_JURISDICTION_CITY}, {settings.DEFAULT_JURISDICTION_REGION}"
+        )
 
-            except Exception as e:
-                logger.error("cortex_execution_failed", error=str(e))
-                return self._fallback_mock_response(query)
-
-        # ---------------------------------------------------------
-        # MOCK IMPLEMENTATION (For Local Offline Dev)
-        # ---------------------------------------------------------
-        return self._fallback_mock_response(query)
-
-    def _fallback_mock_response(self, query: str) -> dict:
-        """Provides a realistic mock response for local offline development."""
-        query_lower = query.lower()
-        city = settings.DEFAULT_JURISDICTION_CITY
-        region = settings.DEFAULT_JURISDICTION_REGION
-
-        if "flood risk" in query_lower or "greatest" in query_lower:
-            return {
-                "response": f"Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in {city} are Barangay Tumaga, Barangay Sta. Maria, and Barangay Tetuan.",
-                "explanation": f"Rainfall in {region} has reached 175mm in the last 12 hours. Sensor ZAM-TUMAGA-01 on the Tumaga River reports a water level of 8.8m, which exceeds the Critical Threshold. The probability of severe flooding is high.",
-                "recommended_actions": [
-                    "Issue Orange Alert",
-                    "Deploy Rescue Teams",
-                    "Open Evacuation Centers",
-                ],
-            }
-        elif "what should we do" in query_lower or "recommend" in query_lower:
-            return {
-                "response": "I strongly recommend immediately upgrading to an Orange Alert for Barangays Tumaga, Sta. Maria, and Tetuan. You should deploy resources and open evacuation centers immediately.",
-                "explanation": "With the Tumaga River at 8.8m, approximately 28,000 residents across Tumaga, Sta. Maria, and Tetuan are in high-risk zones. Immediate mobilization is required.",
-                "recommended_actions": [
-                    "Deploy 8 rescue teams",
-                    "Dispatch 4 ambulances",
-                    "Open Tumaga Gym & City Coliseum",
-                ],
-            }
-        elif "notify" in query_lower or "alert" in query_lower:
-            return {
-                "response": "Understood. I have drafted emergency alerts warning residents of Tumaga, Sta. Maria, and Tetuan to prepare for possible evacuation.",
-                "explanation": "Notifications will be routed through the Job Execution Engine for reliable delivery via SMS and Email to the estimated 28,000 affected population.",
-                "recommended_actions": [
-                    "Approve Notification Dispatch",
-                    "Monitor Delivery Dashboard",
-                ],
-            }
+        if context_str:
+            final_prompt = (
+                f"Target Jurisdiction: {location_context}\n"
+                f"Context from SOP: {context_str}\n\n"
+                f"Question: {query}"
+            )
         else:
-            return {
-                "response": f"I am monitoring the situation. Current weather feeds indicate 'Typhoon Approaching' with 175mm rainfall recorded in {region}.",
-                "explanation": "Tumaga River is currently at critical levels (8.8m). Please ask about flood risk or recommendations for detailed actions.",
-                "recommended_actions": ["Assess Flood Risk", "Review Resources"],
-            }
+            final_prompt = (
+                f"Target Jurisdiction: {location_context}\n"
+                f"Answer concisely based on current telemetry.\n\n"
+                f"Question: {query}"
+            )
+
+        sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
+        cursor.execute(sql, (final_prompt,))
+        result = cursor.fetchone()
+        logger.info("cortex_execution_successful", result=result)
+
+        explanation = f"Generated live using Snowflake Cortex ({settings.SNOWFLAKE_CORTEX_MODEL}) against active Sentinel AI database."
+        if context_str:
+            explanation += " Grounded with SOP Search."
+
+        response_text = str(result[0]) if result and len(result) > 0 and result[0] else ""
+
+        return {
+            "response": response_text,
+            "explanation": explanation,
+            "recommended_actions": [
+                "Issue Evacuation Advisory",
+                "Dispatch Emergency Notifications",
+            ],
+        }
 
     def get_recommendations(self) -> dict:
         """Provides dynamic Cortex AI recommendations query based on live Snowflake telemetry."""
-        if self.conn:
-            try:
-                cursor = self.conn.cursor()
+        if not self.conn:
+            self._connect_to_snowflake()
 
-                # 1. Fetch live telemetry metrics from Snowflake tables
-                cursor.execute("""
-                    SELECT r.barangay, r.water_level, b.population, w.rainfall, w.storm_name
-                    FROM river_sensors r
-                    JOIN barangays b ON r.barangay = b.barangay
-                    CROSS JOIN (SELECT rainfall, storm_name FROM weather_data ORDER BY timestamp DESC LIMIT 1) w
-                    ORDER BY r.water_level DESC
-                """)
-                rows = cursor.fetchall()
-                print(rows)
+        if not self.conn:
+            raise RuntimeError("Snowflake database connection is unavailable.")
 
-                if rows:
-                    high_risk_barangays = [r[0] for r in rows if r[1] >= 6.0]
-                    total_affected_pop = sum([r[2] for r in rows if r[1] >= 6.0])
-                    highest_water_level = max([r[1] for r in rows])
+        cursor = self.conn.cursor()
 
-                    prompt = f"""
-                    You are an Emergency Operations AI Copilot.
-                    Analyze current disaster telemetry for {settings.DEFAULT_JURISDICTION_CITY} ({settings.DEFAULT_JURISDICTION_REGION}):
-                    - Storm: {rows[0][4]} ({rows[0][3]}mm rainfall)
-                    - Highest River Sensor Water Level: {highest_water_level}m
-                    - High Risk Barangays: {", ".join(high_risk_barangays)}
-                    - Estimated Affected Population: {total_affected_pop}
+        # 1. Fetch live telemetry metrics from Snowflake tables
+        cursor.execute("""
+            SELECT r.barangay, r.water_level, b.population, w.rainfall, w.storm_name
+            FROM river_sensors r
+            JOIN barangays b ON r.barangay = b.barangay
+            CROSS JOIN (SELECT rainfall, storm_name FROM weather_data ORDER BY timestamp DESC LIMIT 1) w
+            ORDER BY r.water_level DESC
+        """)
+        rows = cursor.fetchall()
 
-                    Return ONLY a JSON object with keys:
-                    "risk_level" (Red Alert, Orange Alert, or Yellow Alert),
-                    "confidence_score" (integer 0-100),
-                    "affected_population" (integer),
-                    "affected_barangays" (list of strings),
-                    "recommended_actions" (list of 3 string directives)
-                    """
+        if not rows:
+            raise RuntimeError("No telemetry data returned from Snowflake database.")
 
-                    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
-                    cursor.execute(cortex_sql, (prompt,))
-                    cortex_res = cursor.fetchone()
+        high_risk_barangays = [r[0] for r in rows if r[1] >= 6.0]
+        total_affected_pop = sum([r[2] for r in rows if r[1] >= 6.0])
+        highest_water_level = max([r[1] for r in rows])
 
-                    if cortex_res and cortex_res[0]:
-                        raw_text = str(cortex_res[0])
-                        json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-                        if json_match:
-                            parsed_rec = json.loads(json_match.group())
-                            return parsed_rec
+        prompt = f"""
+        You are an Emergency Operations AI Copilot.
+        Analyze current disaster telemetry for {settings.DEFAULT_JURISDICTION_CITY} ({settings.DEFAULT_JURISDICTION_REGION}):
+        - Storm: {rows[0][4]} ({rows[0][3]}mm rainfall)
+        - Highest River Sensor Water Level: {highest_water_level}m
+        - High Risk Barangays: {", ".join(high_risk_barangays)}
+        - Estimated Affected Population: {total_affected_pop}
 
-                    # Computed fallback if LLM response is not strict JSON
-                    return {
-                        "risk_level": "Orange Alert"
-                        if highest_water_level >= 8.0
-                        else "Yellow Alert",
-                        "confidence_score": 94,
-                        "affected_population": total_affected_pop or 28000,
-                        "affected_barangays": high_risk_barangays
-                        or ["Tumaga", "Sta. Maria", "Tetuan"],
-                        "recommended_actions": [
-                            f"Deploy rescue teams to {high_risk_barangays[0] if high_risk_barangays else 'Tumaga'}",
-                            "Dispatch multi-channel emergency broadcast",
-                            "Open local evacuation gymnasiums",
-                        ],
-                    }
-            except Exception as e:
-                logger.error("snowflake_recommendation_fetch_failed", error=str(e))
+        Return ONLY a JSON object with keys:
+        "risk_level" (Red Alert, Orange Alert, or Yellow Alert),
+        "confidence_score" (integer 0-100),
+        "affected_population" (integer),
+        "affected_barangays" (list of strings),
+        "recommended_actions" (list of 3 string directives)
+        """
 
-        # Fallback Mock for local offline development
+        cortex_sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
+        cursor.execute(cortex_sql, (prompt,))
+        cortex_res = cursor.fetchone()
+
+        if cortex_res and cortex_res[0]:
+            raw_text = str(cortex_res[0])
+            json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+
         return {
-            "risk_level": "Orange Alert",
-            "confidence_score": 92,
-            "affected_population": 28000,
-            "affected_barangays": ["Tumaga", "Sta. Maria", "Tetuan"],
+            "risk_level": "Orange Alert" if highest_water_level >= 8.0 else "Yellow Alert",
+            "confidence_score": 94,
+            "affected_population": total_affected_pop,
+            "affected_barangays": high_risk_barangays,
             "recommended_actions": [
-                "Deploy 8 rescue teams",
-                "Dispatch 4 ambulances",
-                "Open Tumaga Gym & City Coliseum",
+                f"Deploy rescue teams to {high_risk_barangays[0] if high_risk_barangays else 'Tumaga'}",
+                "Dispatch multi-channel emergency broadcast",
+                "Open local evacuation gymnasiums",
             ],
         }
 

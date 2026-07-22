@@ -30,9 +30,6 @@ class TelemetryService:
             logger.info("Telemetry streaming stopped.")
 
     def _fetch_snowflake_sensor_readings(self):
-        if settings.SNOWFLAKE_ACCOUNT == "placeholder_account":
-            return None
-
         try:
             conn = snowflake.connector.connect(
                 user=settings.SNOWFLAKE_USER,

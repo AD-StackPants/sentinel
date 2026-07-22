@@ -37,9 +37,6 @@ def _generate_dynamic_risk_polygon(points, buffer=0.012):
 
 
 def _fetch_snowflake_map_features():
-    if settings.SNOWFLAKE_ACCOUNT == "placeholder_account":
-        return None
-
     try:
         conn = snowflake.connector.connect(
             user=settings.SNOWFLAKE_USER,
