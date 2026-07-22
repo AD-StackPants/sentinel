@@ -92,7 +92,7 @@ tables:
         default_aggregation: sum
 
   - name: river_sensors
-    description: Real-time water level sensor readings
+    description: Real-time water level sensor readings with per-sensor flood alert thresholds and computed alert level
     base_table:
       database: SENTINEL_AI_DB
       schema: PUBLIC
@@ -106,10 +106,24 @@ tables:
         description: Barangay where sensor is located
         expr: barangay
         data_type: TEXT
+      - name: alert_level
+        description: "Current flood alert classification computed from water level vs thresholds: RED ALERT (>= 8.0m), ORANGE ALERT (>= 6.0m), NORMAL (< 6.0m). Updated by Celery worker every ~60s."
+        expr: alert_level
+        data_type: TEXT
     measures:
       - name: water_level
-        description: Water level reading in meters
+        description: Current water level reading in meters (updated by Celery every ~60s)
         expr: water_level
+        data_type: NUMBER
+        default_aggregation: max
+      - name: critical_threshold
+        description: RED ALERT water level threshold in meters (default 8.0m per SOP)
+        expr: critical_threshold
+        data_type: NUMBER
+        default_aggregation: max
+      - name: warning_threshold
+        description: ORANGE ALERT water level threshold in meters (default 6.0m per SOP)
+        expr: warning_threshold
         data_type: NUMBER
         default_aggregation: max
 
@@ -184,12 +198,16 @@ tables:
         data_type: NUMBER
         default_aggregation: sum
 '''
-    import tempfile
-    with tempfile.NamedTemporaryFile('w', delete=False, suffix='.yaml') as f:
+    import os, tempfile
+    # Use a fixed filename so Snowflake stage resolves to exactly:
+    #   @AGENT_SKILLS_STAGE/sentinel_semantic_model.yaml
+    # (Random tempfile names cause Snowflake to append the local basename as a sub-path)
+    tmp_dir = tempfile.gettempdir()
+    tmp_path = os.path.join(tmp_dir, 'sentinel_semantic_model.yaml')
+    with open(tmp_path, 'w') as f:
         f.write(yaml_content)
-        temp_path = f.name
     
-    session.file.put(temp_path, '@AGENT_SKILLS_STAGE/sentinel_semantic_model.yaml', auto_compress=False, overwrite=True)
+    session.file.put(tmp_path, '@AGENT_SKILLS_STAGE/', auto_compress=False, overwrite=True)
     return 'SUCCESS'
 $$;
 

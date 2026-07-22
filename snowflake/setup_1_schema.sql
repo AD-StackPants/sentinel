@@ -28,7 +28,10 @@ CREATE OR REPLACE TABLE river_sensors (
     water_level FLOAT,
     timestamp TIMESTAMP,
     latitude FLOAT,
-    longitude FLOAT
+    longitude FLOAT,
+    critical_threshold FLOAT DEFAULT 8.0,   -- RED ALERT threshold (meters)
+    warning_threshold  FLOAT DEFAULT 6.0,   -- ORANGE ALERT threshold (meters)
+    alert_level        STRING                -- Computed: RED ALERT / ORANGE ALERT / YELLOW ALERT / NORMAL
 );
 
 CREATE OR REPLACE TABLE barangays (

@@ -135,9 +135,16 @@ def fetch_and_store_live_weather_task(self):
         for idx, (s_id, base_level) in enumerate(active_sensors):
             surge_offset = round(rainfall_val / (100.0 + (idx * 5)), 1)
             updated_level = round(float(base_level or 6.0) + surge_offset, 1)
+            # Recompute alert_level per SOP thresholds so the DB column stays current
+            if updated_level >= 8.0:
+                computed_alert = "RED ALERT"
+            elif updated_level >= 6.0:
+                computed_alert = "ORANGE ALERT"
+            else:
+                computed_alert = "NORMAL"
             cursor.execute(
-                "UPDATE river_sensors SET water_level = %s, timestamp = CURRENT_TIMESTAMP() WHERE sensor_id = %s",
-                (updated_level, s_id),
+                "UPDATE river_sensors SET water_level = %s, alert_level = %s, timestamp = CURRENT_TIMESTAMP() WHERE sensor_id = %s",
+                (updated_level, computed_alert, s_id),
             )
             sensor_count += 1
 

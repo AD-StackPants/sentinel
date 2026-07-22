@@ -39,20 +39,23 @@ INSERT INTO barangays (barangay, city, population, latitude, longitude) VALUES
 ('Curuan', 'Zamboanga City', 11800, 7.2150, 122.2420),
 ('Vitali', 'Zamboanga City', 14200, 7.3600, 122.2800);
 
--- 3. River Sensors (Real Telemetry Station Network across River Basins with distinct coordinates)
-INSERT INTO river_sensors (sensor_id, barangay, water_level, timestamp, latitude, longitude) VALUES
-('ZAM-TUMAGA-01', 'Tumaga', 8.8, CURRENT_TIMESTAMP, 6.9440, 122.0630),
-('ZAM-STAMARIA-01', 'Sta. Maria', 7.4, CURRENT_TIMESTAMP, 6.9355, 122.0740),
-('ZAM-TETUAN-01', 'Tetuan', 6.9, CURRENT_TIMESTAMP, 6.9230, 122.0840),
-('ZAM-TUGBUNGAN-01', 'Tugbungan', 7.1, CURRENT_TIMESTAMP, 6.9185, 122.0940),
-('ZAM-TALONTALON-01', 'Talon-Talon', 6.8, CURRENT_TIMESTAMP, 6.9060, 122.1040),
-('ZAM-MANICAHAN-01', 'Manicahan', 6.2, CURRENT_TIMESTAMP, 7.0185, 122.1980),
-('ZAM-PASONANCA-01', 'Pasonanca', 4.5, CURRENT_TIMESTAMP, 6.9580, 122.0690),
-('ZAM-SANJOSE-01', 'San Jose Gusu', 5.2, CURRENT_TIMESTAMP, 6.9200, 122.0510),
-('ZAM-BALIWASAN-01', 'Baliwasan', 4.8, CURRENT_TIMESTAMP, 6.9140, 122.0590),
-('ZAM-MERCEDES-01', 'Mercedes', 5.5, CURRENT_TIMESTAMP, 6.9470, 122.1330),
-('ZAM-AYALA-01', 'Ayala', 3.9, CURRENT_TIMESTAMP, 6.9600, 121.9520),
-('ZAM-VITALI-01', 'Vitali', 3.1, CURRENT_TIMESTAMP, 7.3580, 122.2780);
+-- 3. River Sensors (Real Telemetry Station Network with per-sensor thresholds and computed alert level)
+--    critical_threshold: RED ALERT  ≥ 8.0m  (or rainfall ≥ 150mm — rainfall checked separately)
+--    warning_threshold:  ORANGE ALERT ≥ 6.0m
+--    alert_level:        computed status — updated by Celery each minute
+INSERT INTO river_sensors (sensor_id, barangay, water_level, timestamp, latitude, longitude, critical_threshold, warning_threshold, alert_level) VALUES
+('ZAM-TUMAGA-01',     'Tumaga',        8.8, CURRENT_TIMESTAMP, 6.9440, 122.0630, 8.0, 6.0, 'RED ALERT'),
+('ZAM-STAMARIA-01',   'Sta. Maria',    7.4, CURRENT_TIMESTAMP, 6.9355, 122.0740, 8.0, 6.0, 'ORANGE ALERT'),
+('ZAM-TETUAN-01',     'Tetuan',        6.9, CURRENT_TIMESTAMP, 6.9230, 122.0840, 8.0, 6.0, 'ORANGE ALERT'),
+('ZAM-TUGBUNGAN-01',  'Tugbungan',     7.1, CURRENT_TIMESTAMP, 6.9185, 122.0940, 8.0, 6.0, 'ORANGE ALERT'),
+('ZAM-TALONTALON-01', 'Talon-Talon',   6.8, CURRENT_TIMESTAMP, 6.9060, 122.1040, 8.0, 6.0, 'ORANGE ALERT'),
+('ZAM-MANICAHAN-01',  'Manicahan',     6.2, CURRENT_TIMESTAMP, 7.0185, 122.1980, 8.0, 6.0, 'ORANGE ALERT'),
+('ZAM-PASONANCA-01',  'Pasonanca',     4.5, CURRENT_TIMESTAMP, 6.9580, 122.0690, 8.0, 6.0, 'NORMAL'),
+('ZAM-SANJOSE-01',    'San Jose Gusu', 5.2, CURRENT_TIMESTAMP, 6.9200, 122.0510, 8.0, 6.0, 'NORMAL'),
+('ZAM-BALIWASAN-01',  'Baliwasan',     4.8, CURRENT_TIMESTAMP, 6.9140, 122.0590, 8.0, 6.0, 'NORMAL'),
+('ZAM-MERCEDES-01',   'Mercedes',      5.5, CURRENT_TIMESTAMP, 6.9470, 122.1330, 8.0, 6.0, 'NORMAL'),
+('ZAM-AYALA-01',      'Ayala',         3.9, CURRENT_TIMESTAMP, 6.9600, 121.9520, 8.0, 6.0, 'NORMAL'),
+('ZAM-VITALI-01',     'Vitali',        3.1, CURRENT_TIMESTAMP, 7.3580, 122.2780, 8.0, 6.0, 'NORMAL');
 
 -- 4. Evacuation Centers (Real Infrastructure Landmarks with distinct coordinates)
 INSERT INTO evacuation_centers (name, capacity, current_occupancy, barangay, latitude, longitude) VALUES
