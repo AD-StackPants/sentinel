@@ -1,19 +1,28 @@
 import asyncio
+import json
 import uuid
 
-import structlog
-from app.core.config import settings
 import snowflake.connector
-import json
+import structlog
+
+from app.core.config import settings
 
 logger = structlog.get_logger()
+
 
 class JobExecutionService:
     def __init__(self):
         # In a real app, this would be backed by Redis/Celery or Snowflake tables
         self.jobs_db = {}
         self.conn = None
+        self._background_tasks = set()
         self._connect_to_snowflake()
+
+    def _schedule_task(self, coro):
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     def _connect_to_snowflake(self):
         try:
@@ -30,7 +39,9 @@ class JobExecutionService:
         except Exception as e:
             logger.error("job_snowflake_connection_failed", error=str(e))
 
-    async def create_job(self, messages: list[str], channels: list[str], recipients_filter: str) -> str:
+    async def create_job(
+        self, messages: list[str], channels: list[str], recipients_filter: str
+    ) -> str:
         job_id = str(uuid.uuid4())
         self.jobs_db[job_id] = {
             "status": "queued",
@@ -38,17 +49,19 @@ class JobExecutionService:
             "channels": channels,
             "recipients_filter": recipients_filter,
             "logs": [f"Job initialized for filter target: {recipients_filter}"],
-            "counts": {"sms": 0, "email": 0}
+            "counts": {"sms": 0, "email": 0},
         }
 
-        asyncio.create_task(self._broadcast_log(job_id, f"Job initialized for filter target: {recipients_filter}"))
+        self._schedule_task(
+            self._broadcast_log(job_id, f"Job initialized for filter target: {recipients_filter}")
+        )
 
         logger.info("job_created", job_id=job_id, channels=channels, filter=recipients_filter)
 
         self._persist_job_state(job_id)
 
         # Start background processing for the mock
-        asyncio.create_task(self.process_job_mock(job_id))
+        self._schedule_task(self.process_job_mock(job_id))
 
         return job_id
 
@@ -68,7 +81,7 @@ class JobExecutionService:
                 self._dispatch_sms(job["messages"], job["recipients_filter"])
                 msg = f"[SMS] Initializing gateway to {job['recipients_filter']}..."
                 job["logs"].append(msg)
-                asyncio.create_task(self._broadcast_log(job_id, msg))
+                self._schedule_task(self._broadcast_log(job_id, msg))
                 await asyncio.sleep(0.4)
 
                 total_sms = 1200
@@ -78,18 +91,18 @@ class JobExecutionService:
                     percent = int((count / total_sms) * 100)
                     msg = f"[SMS] Dispatched {count:,} / {total_sms:,} messages ({percent}%)..."
                     job["logs"].append(msg)
-                    asyncio.create_task(self._broadcast_log(job_id, msg))
+                    self._schedule_task(self._broadcast_log(job_id, msg))
                     await asyncio.sleep(0.5)
 
                 msg = "[SMS] ✅ Broadcast completed to all high-risk mobile subscribers."
                 job["logs"].append(msg)
-                asyncio.create_task(self._broadcast_log(job_id, msg))
+                self._schedule_task(self._broadcast_log(job_id, msg))
 
             elif channel == "email":
                 self._dispatch_email(job["messages"], job["recipients_filter"])
-                msg = f"[Email] Connecting to SMTP relay service..."
+                msg = "[Email] Connecting to SMTP relay service..."
                 job["logs"].append(msg)
-                asyncio.create_task(self._broadcast_log(job_id, msg))
+                self._schedule_task(self._broadcast_log(job_id, msg))
                 await asyncio.sleep(0.4)
 
                 total_email = 3500
@@ -99,18 +112,18 @@ class JobExecutionService:
                     percent = int((count / total_email) * 100)
                     msg = f"[Email] Dispatched {count:,} / {total_email:,} emails ({percent}%)..."
                     job["logs"].append(msg)
-                    asyncio.create_task(self._broadcast_log(job_id, msg))
+                    self._schedule_task(self._broadcast_log(job_id, msg))
                     await asyncio.sleep(0.5)
 
                 msg = "[Email] ✅ Broadcast completed to registered emergency contacts."
                 job["logs"].append(msg)
-                asyncio.create_task(self._broadcast_log(job_id, msg))
+                self._schedule_task(self._broadcast_log(job_id, msg))
 
         await asyncio.sleep(0.4)
         self.jobs_db[job_id]["status"] = "completed"
         msg = "🎯 All multi-channel emergency dispatches verified & completed."
         job["logs"].append(msg)
-        asyncio.create_task(self._broadcast_log(job_id, msg))
+        self._schedule_task(self._broadcast_log(job_id, msg))
         logger.info("job_completed", job_id=job_id)
 
     def get_job_status(self, job_id: str) -> dict:
@@ -121,7 +134,7 @@ class JobExecutionService:
             "job_id": job_id,
             "status": self.jobs_db[job_id]["status"],
             "logs": self.jobs_db[job_id]["logs"],
-            "counts": self.jobs_db[job_id].get("counts", {})
+            "counts": self.jobs_db[job_id].get("counts", {}),
         }
 
     def _dispatch_sms(self, messages: list[str], recipients_filter: str):
@@ -139,13 +152,15 @@ class JobExecutionService:
 
         job = self.jobs_db.get(job_id)
         if job:
-            await manager.broadcast({
-                "type": "job_log_update",
-                "job_id": job_id,
-                "log": log,
-                "counts": job.get("counts", {}),
-                "status": job["status"]
-            })
+            await manager.broadcast(
+                {
+                    "type": "job_log_update",
+                    "job_id": job_id,
+                    "log": log,
+                    "counts": job.get("counts", {}),
+                    "status": job["status"],
+                }
+            )
 
             # For simplicity, we just update the whole job state in Snowflake when a log is added.
             # In a real system, you might append to a log table directly.
@@ -158,7 +173,10 @@ class JobExecutionService:
                 cursor = self.conn.cursor()
 
                 # Check if job exists
-                cursor.execute("SELECT job_id FROM SENTINEL_AI_DB.PUBLIC.execution_jobs WHERE job_id = %s", (job_id,))
+                cursor.execute(
+                    "SELECT job_id FROM SENTINEL_AI_DB.PUBLIC.execution_jobs WHERE job_id = %s",
+                    (job_id,),
+                )
                 exists = cursor.fetchone()
 
                 logs_json = json.dumps(job["logs"])
@@ -179,9 +197,17 @@ class JobExecutionService:
                         (job_id, status, messages, channels, recipients_filter, logs, counts)
                         SELECT %s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s)
                     """
-                    cursor.execute(sql, (
-                        job_id, job["status"], messages_json, channels_json,
-                        job["recipients_filter"], logs_json, counts_json
-                    ))
+                    cursor.execute(
+                        sql,
+                        (
+                            job_id,
+                            job["status"],
+                            messages_json,
+                            channels_json,
+                            job["recipients_filter"],
+                            logs_json,
+                            counts_json,
+                        ),
+                    )
             except Exception as e:
                 logger.error("failed_to_persist_job", job_id=job_id, error=str(e))

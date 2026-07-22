@@ -1,9 +1,12 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.api.websocket_manager import manager
 import logging
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.api.websocket_manager import manager
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
+
 
 @router.websocket("/telemetry")
 async def websocket_endpoint(websocket: WebSocket):

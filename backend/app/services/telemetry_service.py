@@ -1,13 +1,15 @@
 import asyncio
-import random
 import logging
+import random
 from datetime import datetime
 
 import snowflake.connector
-from app.core.config import settings
+
 from app.api.websocket_manager import manager
+from app.core.config import settings
 
 logger = logging.getLogger("uvicorn.error")
+
 
 class TelemetryService:
     def __init__(self):
@@ -51,12 +53,16 @@ class TelemetryService:
                 data = []
                 for sensor_id, base_level in rows:
                     # Apply micro fluctuation (+/- 0.1m) to simulate live sensor jitter around actual DB level
-                    jittered_level = round(max(0.0, float(base_level) + random.uniform(-0.1, 0.1)), 1)
-                    data.append({
-                        "name": sensor_id,
-                        "level": jittered_level,
-                        "timestamp": datetime.now().isoformat()
-                    })
+                    jittered_level = round(
+                        max(0.0, float(base_level) + random.uniform(-0.1, 0.1)), 1
+                    )
+                    data.append(
+                        {
+                            "name": sensor_id,
+                            "level": jittered_level,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
                 return data
         except Exception as e:
             logger.error(f"Error fetching Snowflake sensor readings: {e}")
@@ -75,19 +81,16 @@ class TelemetryService:
                         {
                             "name": "ZAM-TUMAGA-01",
                             "level": round(random.uniform(7.0, 9.5), 1),
-                            "timestamp": datetime.now().isoformat()
+                            "timestamp": datetime.now().isoformat(),
                         },
                         {
                             "name": "ZAM-STAMARIA-01",
                             "level": round(random.uniform(5.0, 8.0), 1),
-                            "timestamp": datetime.now().isoformat()
-                        }
+                            "timestamp": datetime.now().isoformat(),
+                        },
                     ]
 
-                sensor_data = {
-                    "type": "sensor_update",
-                    "data": readings
-                }
+                sensor_data = {"type": "sensor_update", "data": readings}
 
                 await manager.broadcast(sensor_data)
 
@@ -98,5 +101,6 @@ class TelemetryService:
             except Exception as e:
                 logger.error(f"Error streaming telemetry: {e}")
                 await asyncio.sleep(2.0)
+
 
 telemetry_service = TelemetryService()

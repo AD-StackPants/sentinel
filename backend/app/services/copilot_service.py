@@ -8,6 +8,7 @@ from app.core.config import settings
 
 logger = structlog.get_logger()
 
+
 class CopilotService:
     def __init__(self):
         # We initialize the connection logic but handle errors gracefully
@@ -34,7 +35,7 @@ class CopilotService:
         except Exception as e:
             logger.error("snowflake_connection_failed", error=str(e))
 
-    def process_query(self, query: str, context: dict = None) -> dict:
+    def process_query(self, query: str, context: dict | None = None) -> dict:
         logger.info("processing_copilot_query", query=query, context=context)
 
         # ---------------------------------------------------------
@@ -47,10 +48,8 @@ class CopilotService:
                 context_str = ""
                 try:
                     import json
-                    search_config = {
-                        "query": query,
-                        "columns": ["content"]
-                    }
+
+                    search_config = {"query": query, "columns": ["content"]}
                     rag_sql = """
                         SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
                             'SENTINEL_SOP_SEARCH_SERVICE',
@@ -62,8 +61,10 @@ class CopilotService:
 
                     if rag_result and len(rag_result) > 0 and rag_result[0]:
                         results_json = json.loads(str(rag_result[0]))
-                        if 'results' in results_json:
-                            context_str = " ".join([r.get('content', '') for r in results_json['results']])
+                        if "results" in results_json:
+                            context_str = " ".join(
+                                [r.get("content", "") for r in results_json["results"]]
+                            )
                 except Exception as rag_e:
                     logger.warning("cortex_search_preview_unavailable", error=str(rag_e))
 
@@ -90,7 +91,10 @@ class CopilotService:
                     return {
                         "response": str(result[0]),
                         "explanation": explanation,
-                        "recommended_actions": ["Issue Evacuation Advisory", "Dispatch Emergency Notifications"]
+                        "recommended_actions": [
+                            "Issue Evacuation Advisory",
+                            "Dispatch Emergency Notifications",
+                        ],
                     }
 
             except Exception as e:
@@ -110,25 +114,36 @@ class CopilotService:
             return {
                 "response": "Based on current river sensor data and heavy rainfall forecasts, the areas at greatest flood risk in Zamboanga City are Barangay Tumaga, Barangay Sta. Maria, and Barangay Tetuan.",
                 "explanation": "Rainfall in the Zamboanga Peninsula has reached 175mm in the last 12 hours. Sensor ZAM-TUMAGA-01 on the Tumaga River reports a water level of 8.8m, which exceeds the Critical Threshold. The probability of severe flooding is high.",
-                "recommended_actions": ["Issue Orange Alert", "Deploy Rescue Teams", "Open Evacuation Centers"]
+                "recommended_actions": [
+                    "Issue Orange Alert",
+                    "Deploy Rescue Teams",
+                    "Open Evacuation Centers",
+                ],
             }
         elif "what should we do" in query_lower or "recommend" in query_lower:
             return {
                 "response": "I strongly recommend immediately upgrading to an Orange Alert for Barangays Tumaga, Sta. Maria, and Tetuan. You should deploy resources and open evacuation centers immediately.",
                 "explanation": "With the Tumaga River at 8.8m, approximately 28,000 residents across Tumaga, Sta. Maria, and Tetuan are in high-risk zones. Immediate mobilization is required.",
-                "recommended_actions": ["Deploy 8 rescue teams", "Dispatch 4 ambulances", "Open Tumaga Gym & City Coliseum"]
+                "recommended_actions": [
+                    "Deploy 8 rescue teams",
+                    "Dispatch 4 ambulances",
+                    "Open Tumaga Gym & City Coliseum",
+                ],
             }
         elif "notify" in query_lower or "alert" in query_lower:
             return {
                 "response": "Understood. I have drafted emergency alerts warning residents of Tumaga, Sta. Maria, and Tetuan to prepare for possible evacuation.",
                 "explanation": "Notifications will be routed through the Job Execution Engine for reliable delivery via SMS and Email to the estimated 28,000 affected population.",
-                "recommended_actions": ["Approve Notification Dispatch", "Monitor Delivery Dashboard"]
+                "recommended_actions": [
+                    "Approve Notification Dispatch",
+                    "Monitor Delivery Dashboard",
+                ],
             }
         else:
             return {
                 "response": "I am monitoring the situation. Current weather feeds indicate 'Typhoon Approaching' with 175mm rainfall recorded in the Zamboanga Peninsula.",
                 "explanation": "Tumaga River is currently at critical levels (8.8m). Please ask about flood risk or recommendations for detailed actions.",
-                "recommended_actions": ["Assess Flood Risk", "Review Resources"]
+                "recommended_actions": ["Assess Flood Risk", "Review Resources"],
             }
 
     def get_recommendations(self) -> dict:
@@ -158,7 +173,7 @@ class CopilotService:
                     Analyze current disaster telemetry for Zamboanga City:
                     - Storm: {rows[0][4]} ({rows[0][3]}mm rainfall)
                     - Highest River Sensor Water Level: {highest_water_level}m
-                    - High Risk Barangays: {', '.join(high_risk_barangays)}
+                    - High Risk Barangays: {", ".join(high_risk_barangays)}
                     - Estimated Affected Population: {total_affected_pop}
 
                     Return ONLY a JSON object with keys:
@@ -169,28 +184,33 @@ class CopilotService:
                     "recommended_actions" (list of 3 string directives)
                     """
 
-                    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
+                    cortex_sql = (
+                        f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
+                    )
                     cursor.execute(cortex_sql, (prompt,))
                     cortex_res = cursor.fetchone()
 
                     if cortex_res and cortex_res[0]:
                         raw_text = str(cortex_res[0])
-                        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                        json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
                         if json_match:
                             parsed_rec = json.loads(json_match.group())
                             return parsed_rec
 
                     # Computed fallback if LLM response is not strict JSON
                     return {
-                        "risk_level": "Orange Alert" if highest_water_level >= 8.0 else "Yellow Alert",
+                        "risk_level": "Orange Alert"
+                        if highest_water_level >= 8.0
+                        else "Yellow Alert",
                         "confidence_score": 94,
                         "affected_population": total_affected_pop or 28000,
-                        "affected_barangays": high_risk_barangays or ["Tumaga", "Sta. Maria", "Tetuan"],
+                        "affected_barangays": high_risk_barangays
+                        or ["Tumaga", "Sta. Maria", "Tetuan"],
                         "recommended_actions": [
                             f"Deploy rescue teams to {high_risk_barangays[0] if high_risk_barangays else 'Tumaga'}",
                             "Dispatch multi-channel emergency broadcast",
-                            "Open local evacuation gymnasiums"
-                        ]
+                            "Open local evacuation gymnasiums",
+                        ],
                     }
             except Exception as e:
                 logger.error("snowflake_recommendation_fetch_failed", error=str(e))
@@ -204,16 +224,19 @@ class CopilotService:
             "recommended_actions": [
                 "Deploy 8 rescue teams",
                 "Dispatch 4 ambulances",
-                "Open Tumaga Gym & City Coliseum"
-            ]
+                "Open Tumaga Gym & City Coliseum",
+            ],
         }
 
-    def save_chat_message(self, session_id: str, role: str, content: str, metadata: dict = None) -> bool:
+    def save_chat_message(
+        self, session_id: str, role: str, content: str, metadata: dict | None = None
+    ) -> bool:
         """Saves a user or assistant chat message to Snowflake chat_history table."""
         if not self.conn:
             return False
         try:
             import uuid
+
             msg_id = str(uuid.uuid4())
             meta_json = json.dumps(metadata or {})
             cursor = self.conn.cursor()
@@ -254,15 +277,17 @@ class CopilotService:
                         meta = json.loads(meta_val) if isinstance(meta_val, str) else meta_val
                     except Exception:
                         pass
-                history.append({
-                    "id": msg_id,
-                    "sender": "user" if role == "user" else "assistant",
-                    "text": content,
-                    "response": content,
-                    "explanation": meta.get("explanation"),
-                    "recommended_actions": meta.get("recommended_actions"),
-                    "timestamp": str(created_at) if created_at else None
-                })
+                history.append(
+                    {
+                        "id": msg_id,
+                        "sender": "user" if role == "user" else "assistant",
+                        "text": content,
+                        "response": content,
+                        "explanation": meta.get("explanation"),
+                        "recommended_actions": meta.get("recommended_actions"),
+                        "timestamp": str(created_at) if created_at else None,
+                    }
+                )
             return history
         except Exception as e:
             logger.error("failed_to_fetch_chat_history", session_id=session_id, error=str(e))

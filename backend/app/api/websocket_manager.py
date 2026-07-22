@@ -1,16 +1,14 @@
-import asyncio
 import json
 import logging
-import random
-from typing import List
 
 from fastapi import WebSocket
 
 logger = logging.getLogger("uvicorn.error")
 
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -20,7 +18,9 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+            logger.info(
+                f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
+            )
 
     async def broadcast(self, message: dict):
         if not self.active_connections:
@@ -41,5 +41,6 @@ class ConnectionManager:
         # Clean up dead connections
         for dead_conn in dead_connections:
             self.disconnect(dead_conn)
+
 
 manager = ConnectionManager()

@@ -15,6 +15,7 @@ DEFAULT_JURISDICTION_CITY_URL = (
     f"&current=precipitation,rain,showers,wind_speed_10m,surface_pressure"
 )
 
+
 def _get_snowflake_conn():
     return snowflake.connector.connect(
         user=settings.SNOWFLAKE_USER,
@@ -26,6 +27,7 @@ def _get_snowflake_conn():
         role=settings.SNOWFLAKE_ROLE,
     )
 
+
 @celery_app.task(
     bind=True,
     name="app.tasks.ingestion_tasks.fetch_and_store_live_weather_task",
@@ -35,7 +37,7 @@ def _get_snowflake_conn():
     retry_backoff=True,
     retry_backoff_max=60,
     retry_jitter=True,
-    rate_limit="10/m"
+    rate_limit="10/m",
 )
 def fetch_and_store_live_weather_task(self):
     """
@@ -45,11 +47,15 @@ def fetch_and_store_live_weather_task(self):
     - Rate Limited to 10 tasks/min
     - Idempotency Check: Prevents duplicate Snowflake DB writes within a 15s window
     """
-    logger.info(f"Celery task [ID: {self.request.id}] started: Fetching live telemetry for {settings.DEFAULT_JURISDICTION_CITY} for Snowflake DB...")
-    
+    logger.info(
+        f"Celery task [ID: {self.request.id}] started: Fetching live telemetry for {settings.DEFAULT_JURISDICTION_CITY} for Snowflake DB..."
+    )
+
     # 1. Fetch live telemetry using httpx client with 10s timeout
     try:
-        with httpx.Client(timeout=10.0, headers={"User-Agent": "SentinelAI-CeleryWorker/1.0"}) as client:
+        with httpx.Client(
+            timeout=10.0, headers={"User-Agent": "SentinelAI-CeleryWorker/1.0"}
+        ) as client:
             resp = client.get(DEFAULT_JURISDICTION_CITY_URL)
             resp.raise_for_status()
             meteo_res = resp.json()
@@ -60,7 +66,7 @@ def fetch_and_store_live_weather_task(self):
             "precipitation": 185.0,
             "rain": 175.0,
             "wind_speed_10m": 88.5,
-            "surface_pressure": 1004.2
+            "surface_pressure": 1004.2,
         }
 
     rainfall_val = float(current.get("precipitation", current.get("rain", 175.0)))
@@ -78,7 +84,9 @@ def fetch_and_store_live_weather_task(self):
         conn = _get_snowflake_conn()
         cursor = conn.cursor()
 
-        jurisdiction_location = f"{settings.DEFAULT_JURISDICTION_REGION} ({settings.DEFAULT_JURISDICTION_CITY})"
+        jurisdiction_location = (
+            f"{settings.DEFAULT_JURISDICTION_REGION} ({settings.DEFAULT_JURISDICTION_CITY})"
+        )
 
         # Idempotency Check: Check if an identical weather snapshot was recorded within last 15 seconds
         cursor.execute(
@@ -86,12 +94,14 @@ def fetch_and_store_live_weather_task(self):
             SELECT COUNT(*) FROM weather_data
             WHERE location = %s AND timestamp >= DATEADD('second', -15, CURRENT_TIMESTAMP())
             """,
-            (jurisdiction_location,)
+            (jurisdiction_location,),
         )
         recent_cnt = cursor.fetchone()[0]
 
         if recent_cnt > 0:
-            logger.info("Idempotency Shield Activated: Duplicate sync requested within 15s window. Skipping DB insert.")
+            logger.info(
+                "Idempotency Shield Activated: Duplicate sync requested within 15s window. Skipping DB insert."
+            )
             cursor.close()
             conn.close()
             return {
@@ -99,7 +109,7 @@ def fetch_and_store_live_weather_task(self):
                 "message": "Telemetry already synced within last 15s window",
                 "timestamp": datetime.now().isoformat(),
                 "source": "Open-Meteo Philippines",
-                "jurisdiction": jurisdiction_location
+                "jurisdiction": jurisdiction_location,
             }
 
         # Insert new weather snapshot into weather_data
@@ -108,7 +118,13 @@ def fetch_and_store_live_weather_task(self):
             INSERT INTO weather_data (timestamp, location, rainfall, wind_speed, storm_name, forecast)
             VALUES (CURRENT_TIMESTAMP(), %s, %s, %s, %s, %s)
             """,
-            (jurisdiction_location, rainfall_val, wind_speed, "Typhoon Calamity Alert", forecast_str)
+            (
+                jurisdiction_location,
+                rainfall_val,
+                wind_speed,
+                "Typhoon Calamity Alert",
+                forecast_str,
+            ),
         )
 
         # Dynamically fetch all active sensors for configured jurisdiction directly from Snowflake DB
@@ -121,7 +137,7 @@ def fetch_and_store_live_weather_task(self):
             updated_level = round(float(base_level or 6.0) + surge_offset, 1)
             cursor.execute(
                 "UPDATE river_sensors SET water_level = %s, timestamp = CURRENT_TIMESTAMP() WHERE sensor_id = %s",
-                (updated_level, s_id)
+                (updated_level, s_id),
             )
             sensor_count += 1
 
@@ -133,17 +149,21 @@ def fetch_and_store_live_weather_task(self):
             """,
             (
                 f"Celery Worker: Synced {rainfall_val}mm rainfall for {jurisdiction_location} ({sensor_count} sensors updated)",
-                "system_execution"
-            )
+                "system_execution",
+            ),
         )
 
         records_updated = sensor_count + 1
         cursor.close()
         conn.close()
-        logger.info(f"Celery Task Success: Snowflake updated with {records_updated} live records for {jurisdiction_location}!")
+        logger.info(
+            f"Celery Task Success: Snowflake updated with {records_updated} live records for {jurisdiction_location}!"
+        )
     except Exception as e:
-        logger.error(f"Snowflake Celery Persistence Error (Attempt {self.request.retries + 1}): {e}")
-        raise self.retry(exc=e)
+        logger.error(
+            f"Snowflake Celery Persistence Error (Attempt {self.request.retries + 1}): {e}"
+        )
+        raise self.retry(exc=e) from e
 
     return {
         "status": "SUCCESS",
@@ -152,5 +172,5 @@ def fetch_and_store_live_weather_task(self):
         "jurisdiction": jurisdiction_location,
         "rainfall_mm": rainfall_val,
         "wind_speed_kmh": wind_speed,
-        "snowflake_records_updated": records_updated
+        "snowflake_records_updated": records_updated,
     }

@@ -5,6 +5,7 @@ from app.core.config import settings
 
 logger = structlog.get_logger()
 
+
 class AuditService:
     def __init__(self):
         self.conn = None
@@ -75,14 +76,17 @@ class AuditService:
                 cursor.close()
                 events = []
                 for evt, evt_type, ts in rows:
-                    events.append({
-                        "event": evt,
-                        "type": evt_type,
-                        "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
-                    })
+                    events.append(
+                        {
+                            "event": evt,
+                            "type": evt_type,
+                            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+                        }
+                    )
                 return events
             except Exception as e:
                 logger.error("failed_to_fetch_audit_events", error=str(e))
         return []
+
 
 audit_service = AuditService()

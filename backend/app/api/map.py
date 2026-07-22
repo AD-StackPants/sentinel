@@ -1,13 +1,14 @@
-from fastapi import APIRouter
-import structlog
+import math
+
 import snowflake.connector
+import structlog
+from fastapi import APIRouter
 
 from app.core.config import settings
 
 logger = structlog.get_logger()
 router = APIRouter()
 
-import math
 
 def _generate_dynamic_risk_polygon(points, buffer=0.012):
     if not points:
@@ -25,12 +26,15 @@ def _generate_dynamic_risk_polygon(points, buffer=0.012):
 
     unique_pts = []
     for p in sorted_pts:
-        if not unique_pts or (abs(p[0] - unique_pts[-1][0]) > 0.003 or abs(p[1] - unique_pts[-1][1]) > 0.003):
+        if not unique_pts or (
+            abs(p[0] - unique_pts[-1][0]) > 0.003 or abs(p[1] - unique_pts[-1][1]) > 0.003
+        ):
             unique_pts.append([round(p[0], 5), round(p[1], 5)])
 
     if unique_pts:
         unique_pts.append(unique_pts[0])
     return [unique_pts]
+
 
 def _fetch_snowflake_map_features():
     if settings.SNOWFLAKE_ACCOUNT == "placeholder_account":
@@ -59,40 +63,45 @@ def _fetch_snowflake_map_features():
         high_risk_rows = cursor.fetchall()
         if high_risk_rows:
             # Cluster by proximity (main city cluster vs outer barangays)
-            main_cluster_pts = [(float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) < 7.0]
-            outer_cluster_pts = [(float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) >= 7.0]
+            main_cluster_pts = [
+                (float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) < 7.0
+            ]
+            outer_cluster_pts = [
+                (float(r[2]), float(r[1])) for r in high_risk_rows if float(r[1]) >= 7.0
+            ]
 
             if main_cluster_pts:
                 poly_coords = _generate_dynamic_risk_polygon(main_cluster_pts, buffer=0.015)
                 if poly_coords and len(poly_coords[0]) >= 4:
-                    features.append({
-                        "type": "Feature",
-                        "properties": {
-                            "type": "risk_zone",
-                            "name": "Tumaga / Central River Basin Active Flood Zone",
-                            "risk_level": "High"
-                        },
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": poly_coords
+                    features.append(
+                        {
+                            "type": "Feature",
+                            "properties": {
+                                "type": "risk_zone",
+                                "name": "Tumaga / Central River Basin Active Flood Zone",
+                                "risk_level": "High",
+                            },
+                            "geometry": {"type": "Polygon", "coordinates": poly_coords},
                         }
-                    })
+                    )
 
             if outer_cluster_pts:
                 poly_coords_outer = _generate_dynamic_risk_polygon(outer_cluster_pts, buffer=0.012)
                 if poly_coords_outer and len(poly_coords_outer[0]) >= 4:
-                    features.append({
-                        "type": "Feature",
-                        "properties": {
-                            "type": "risk_zone",
-                            "name": "North Zamboanga River Spillway Risk Zone",
-                            "risk_level": "High"
-                        },
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": poly_coords_outer
+                    features.append(
+                        {
+                            "type": "Feature",
+                            "properties": {
+                                "type": "risk_zone",
+                                "name": "North Zamboanga River Spillway Risk Zone",
+                                "risk_level": "High",
+                            },
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": poly_coords_outer,
+                            },
                         }
-                    })
+                    )
 
         # 2. Fetch Evacuation Centers directly from Snowflake DB
         cursor.execute("""
@@ -102,19 +111,21 @@ def _fetch_snowflake_map_features():
         for row in cursor.fetchall():
             name, cap, occ, lat, lon = row
             if lat is not None and lon is not None:
-                features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "type": "evacuation_center",
-                        "name": name,
-                        "capacity": cap,
-                        "occupancy": occ
-                    },
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [float(lon), float(lat)]
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "type": "evacuation_center",
+                            "name": name,
+                            "capacity": cap,
+                            "occupancy": occ,
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [float(lon), float(lat)],
+                        },
                     }
-                })
+                )
 
         # 3. Fetch Hospitals directly from Snowflake DB
         cursor.execute("""
@@ -124,18 +135,20 @@ def _fetch_snowflake_map_features():
         for row in cursor.fetchall():
             h_name, beds, lat, lon = row
             if lat is not None and lon is not None:
-                features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "type": "hospital",
-                        "name": h_name,
-                        "beds": beds
-                    },
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [float(lon), float(lat)]
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "type": "hospital",
+                            "name": h_name,
+                            "beds": beds,
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [float(lon), float(lat)],
+                        },
                     }
-                })
+                )
 
         # 4. Fetch River Sensors directly from Snowflake DB
         cursor.execute("""
@@ -146,19 +159,21 @@ def _fetch_snowflake_map_features():
             s_id, level, lat, lon = row
             if lat is not None and lon is not None:
                 status = "Critical" if level >= 8.0 else ("Warning" if level >= 6.0 else "Normal")
-                features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "type": "sensor",
-                        "name": s_id,
-                        "level": f"{level}m",
-                        "status": status
-                    },
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [float(lon), float(lat)]
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "type": "sensor",
+                            "name": s_id,
+                            "level": f"{level}m",
+                            "status": status,
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [float(lon), float(lat)],
+                        },
                     }
-                })
+                )
 
         cursor.close()
         conn.close()
@@ -166,6 +181,7 @@ def _fetch_snowflake_map_features():
     except Exception as e:
         logger.error("failed_to_fetch_snowflake_map_data", error=str(e))
         return {"type": "FeatureCollection", "features": []}
+
 
 @router.get("/data")
 def get_map_data():

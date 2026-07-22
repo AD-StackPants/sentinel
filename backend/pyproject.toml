@@ -1,19 +1,37 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sentinel backend service for disaster management, weather monitoring, and emergency response"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "celery>=5.3.6",
     "fastapi[standard]>=0.139.2",
-    "httpx>=0.28.1",
-    "pydantic>=2.13.4",
-    "pydantic-settings>=2.14.2",
-    "pytest>=9.1.1",
-    "redis>=5.0.1",
-    "snowflake-connector-python>=4.7.1",
     "structlog>=26.1.0",
+    "redis>=5.0.1",
+    "celery>=5.3.6",
+    "snowflake-connector-python>=4.7.1",
     "twilio>=9.10.9",
-    "uvicorn>=0.51.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.21",
+    "ty>=0.0.59",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "RUF"]
+ignore = ["B008", "E501"]
+
+[tool.ty]
+

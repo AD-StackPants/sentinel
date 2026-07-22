@@ -1,11 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import copilot
-from app.api import jobs
-from app.api import map
-from app.api import websocket
-from app.api import audit
-from app.api import ingestion
+from app.api import audit, copilot, ingestion, jobs, map, websocket
 
 api_router = APIRouter()
 api_router.include_router(copilot.router, prefix="/copilot", tags=["copilot"])
