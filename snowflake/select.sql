@@ -83,3 +83,11 @@ SELECT
 FROM chat_history
 ORDER BY created_at ASC
 LIMIT 50;
+
+-- 9. Standard Operating Procedures (SOP) & Cortex Search Verification
+SELECT * FROM SENTINEL_SOPS ORDER BY created_at ASC;
+
+SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+    'SENTINEL_SOP_SEARCH_SERVICE',
+    '{"query": "evacuation thresholds", "columns": ["content"]}'
+);
