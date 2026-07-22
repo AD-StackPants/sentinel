@@ -2,71 +2,191 @@ name: SentinelAI
 description: AI-powered Emergency Operations Copilot helping disaster response agencies assess risks, recommend actions, and reliably notify affected communities.
 
 instructions: |
-  You are an Emergency Operations Copilot.
-  Your primary role is to assist emergency officers in assessing disaster risks, determining the impact on communities,
-  recommending resources, and coordinating alerts. You must act as a reliable decision-support system, providing evidence-based
-  recommendations from the available data. Always explain the reasoning behind your recommendations clearly and succinctly.
+  You are SentinelAI, an Emergency Operations Copilot designed for disaster response officers.
+  Your primary role is to assist emergency officers in assessing disaster risks, evaluating river sensor telemetry,
+  determining impact on barangays, recommending tactical resources, and dispatching multi-channel emergency alerts.
+  Always provide evidence-based recommendations grounded in current telemetry and official SOPs.
+  Never invent sensor readings or bypass safety thresholds.
 
 skills:
   - name: weather_intelligence
-    description: Retrieves current weather conditions and forecasts.
+    description: |
+      Retrieves current weather conditions, active precipitation (mm), wind speed, and meteorological forecasts
+      for specified Philippine cities or regions. Use this skill whenever officers ask about weather forecasts,
+      rainfall totals, approaching typhoons, or PAGASA/Open-Meteo telemetry status.
     input:
-      location: string
-      date: string
+      location:
+        type: string
+        required: true
+        description: Target Philippine city, municipality, or region (e.g., 'Zamboanga City', 'Zamboanga Peninsula').
+        default: "Zamboanga City"
+      date:
+        type: string
+        required: false
+        description: Target date or ISO timestamp. Defaults to current live timestamp if omitted.
     output:
-      rainfall: float
-      storm_category: string
-      forecast: string
+      rainfall:
+        type: float
+        description: Recorded active 12-hour rainfall volume in millimeters (mm).
+      storm_category:
+        type: string
+        description: PAGASA storm classification (e.g., 'Tropical Depression', 'Severe Tropical Storm', 'Super Typhoon').
+      forecast:
+        type: string
+        description: Human-readable meteorological narrative and runoff warning forecast.
+    constraints:
+      - If rainfall > 150.0mm within 12 hours, automatically classify storm as critical hazard.
+      - If location is missing or ambiguous, fallback to configured jurisdiction (Zamboanga City).
 
   - name: flood_risk_assessment
-    description: Estimates flooding risk based on rainfall, river level, and historical data.
+    description: |
+      Estimates real-time flood risk levels (Red Alert, Orange Alert, Yellow Alert, Normal) for vulnerable river basins
+      and barangays based on river sensor water levels, active rainfall, and terrain elevation data.
+      Trigger this skill when evaluating river basin runoff, sensor thresholds, or barangay flood exposure.
     input:
-      rainfall: float
-      river_level: float
-      historical_flooding: boolean
+      rainfall:
+        type: float
+        required: true
+        description: Accumulated rainfall volume in mm. Must be >= 0.0.
+      river_level:
+        type: float
+        required: true
+        description: Live river sensor water level reading in meters (m). Critical threshold is 8.0m.
+      historical_flooding:
+        type: boolean
+        required: false
+        description: Flag indicating if target area has known flood vulnerability during high tides or spillway releases.
+        default: true
     output:
-      risk_level: string
-      confidence: float
-      explanation: string
+      risk_level:
+        type: string
+        enum: ["Red Alert", "Orange Alert", "Yellow Alert", "Normal"]
+        description: Operational risk alert status code.
+      confidence:
+        type: float
+        description: Statistical confidence score between 0.0 and 1.0 (e.g., 0.95 = 95%).
+      explanation:
+        type: string
+        description: Detailed rationale referencing specific sensor thresholds, runoff rates, and high-risk barangays.
+    constraints:
+      - Mandatory Rule: If river_level >= 8.0m OR rainfall >= 150.0mm, risk_level MUST be 'Red Alert' or 'Orange Alert'.
+      - If sensor data is offline or unreachable, flag confidence as < 0.50 and log fallback telemetry.
 
   - name: population_impact
-    description: Estimates the affected population for a given set of barangays.
+    description: |
+      Calculates the estimated number of impacted residents, households, and vulnerable sectors (elderly, infants, PWDs)
+      for affected barangays based on official census statistics and active flood contours.
     input:
-      barangays: array of strings
+      barangays:
+        type: array
+        items: string
+        required: true
+        description: List of targeted barangay names (e.g., ['Tumaga', 'Sta. Maria', 'Tetuan']).
     output:
-      residents: integer
-      households: integer
-      vulnerable_sectors: array of strings
+      residents:
+        type: integer
+        description: Total estimated number of individuals residing in the affected flood zone.
+      households:
+        type: integer
+        description: Total estimated number of affected household units.
+      vulnerable_sectors:
+        type: array
+        items: string
+        description: Key vulnerable demographic groups requiring priority evacuation assistance.
+    constraints:
+      - Must handle empty barangay arrays gracefully by returning jurisdiction-wide estimates.
 
   - name: resource_recommendation
-    description: Recommends operational resources based on the situation.
+    description: |
+      Recommends tactical resource allocation (watercraft, rescue teams, medical units, open evacuation shelters)
+      based on alert level severity and impacted population size.
     input:
-      risk_level: string
-      affected_population: integer
+      risk_level:
+        type: string
+        enum: ["Red Alert", "Orange Alert", "Yellow Alert", "Normal"]
+        required: true
+        description: Current operational alert level.
+      affected_population:
+        type: integer
+        required: true
+        description: Estimated total population in affected flood risk zones.
     output:
-      rescue_teams: integer
-      boats: integer
-      medical_teams: integer
-      evacuation_centers: integer
+      rescue_teams:
+        type: integer
+        description: Number of swift-water rescue teams to deploy.
+      boats:
+        type: integer
+        description: Number of inflatable rescue boats required.
+      medical_teams:
+        type: integer
+        description: Number of emergency medical personnel and ambulances to dispatch.
+      evacuation_centers:
+        type: integer
+        description: Number of primary evacuation shelters to activate and open.
+    constraints:
+      - For 'Red Alert' with affected_population > 10,000, recommend at least 8 rescue teams, 12 boats, and 4 evacuation centers.
 
   - name: alert_generator
-    description: Generates multilingual emergency advisories.
+    description: |
+      Generates localized, multi-channel emergency advisory copy (SMS broadcast text, email alert, public bulletin)
+      tailored for targeted communities in English, Tagalog, and local dialects.
     input:
-      alert_level: string
-      recommended_actions: array of strings
-      affected_areas: array of strings
+      alert_level:
+        type: string
+        required: true
+        description: Target alert status (e.g., 'RED ALERT - EVACUATE IMMEDIATELY').
+      recommended_actions:
+        type: array
+        items: string
+        required: true
+        description: List of immediate protective action directives for residents.
+      affected_areas:
+        type: array
+        items: string
+        required: true
+        description: Targeted barangays or river basin sectors.
     output:
-      sms: string
-      email: string
-      public_advisory: string
+      sms:
+        type: string
+        description: Concise SMS alert message under 160 characters formatted with emergency numbers.
+      email:
+        type: string
+        description: Detailed formal HTML email advisory for barangay captains and emergency responders.
+      public_advisory:
+        type: string
+        description: Official public press statement for social media and broadcast channels.
+    constraints:
+      - SMS output MUST remain under 160 characters for single-SMS gateway transmission reliability.
 
   - name: notification_dispatcher
-    description: Executes the delivery of generated notifications using the Job Execution Engine.
+    description: |
+      Executes and dispatches emergency alert campaigns through the Job Execution Engine, broadcasting SMS and Email
+      messages to registered emergency contacts and high-risk mobile subscribers.
     input:
-      messages: array of strings
-      channels: array of strings
-      recipients_filter: string
+      messages:
+        type: array
+        items: string
+        required: true
+        description: Array of validated message copy texts to dispatch.
+      channels:
+        type: array
+        items: string
+        required: true
+        description: Targeted delivery channels (['sms'], ['email'], or ['sms', 'email']).
+      recipients_filter:
+        type: string
+        required: true
+        description: Recipient filter query or demographic target (e.g., 'high_risk_subscribers_tumaga').
     output:
-      job_id: string
-      delivery_status: string
-      execution_history: string
+      job_id:
+        type: string
+        description: Unique UUID generated by Job Execution Engine for tracking dispatch status.
+      delivery_status:
+        type: string
+        description: Initial job status ('queued', 'processing', 'completed').
+      execution_history:
+        type: string
+        description: Initial log entry recorded in the execution audit log.
+    constraints:
+      - Requires at least 1 valid delivery channel ('sms' or 'email').
+      - All dispatch jobs MUST create a tracking UUID in execution audit logs.
