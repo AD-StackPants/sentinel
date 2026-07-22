@@ -126,8 +126,13 @@ SENTINEL_AI_DB.PUBLIC
 └── chat_history         (id, session_id, role, content, metadata, created_at)
 ```
 
-- **Schema Definition**: [`snowflake/schema.sql`](snowflake/schema.sql)
-- **Seed Telemetry**: [`snowflake/seed.sql`](snowflake/seed.sql) (pre-loaded with realistic Zamboanga City disaster telemetry)
+- **Schema Definition**: [`snowflake/setup_1_schema.sql`](snowflake/setup_1_schema.sql)
+- **Seed Telemetry**: [`snowflake/setup_2_seed.sql`](snowflake/setup_2_seed.sql) (pre-loaded with realistic Zamboanga City disaster telemetry)
+- **Cortex Search Service**: [`snowflake/setup_3_cortex_search.sql`](snowflake/setup_3_cortex_search.sql) (SOP reference table & vector search)
+- **Cortex Semantic View**: [`snowflake/setup_4_semantic_view.sql`](snowflake/setup_4_semantic_view.sql) (Cortex Analyst Text-to-SQL view)
+- **Cortex Agent Creation**: [`snowflake/setup_5_cortex_agent.sql`](snowflake/setup_5_cortex_agent.sql) (Agent specification, orchestration, and staged skills)
+- **PAT Authentication**: [`snowflake/pat_auth.sql`](snowflake/pat_auth.sql) (Optional Cortex CLI auth policy & PAT token setup)
+- **Analytical Verification**: [`snowflake/select.sql`](snowflake/select.sql) (Verification & query checks)
 
 ---
 
@@ -135,7 +140,7 @@ SENTINEL_AI_DB.PUBLIC
 
 ### 🤖 1. Copilot Intelligence Interface
 - Ask free-form operational questions or use quick-action prompt buttons (*"What is the flood risk?"*, *"What should we do?"*, *"Notify affected residents"*).
-- Grounded responses powered by **Snowflake Cortex LLM** (`SNOWFLAKE.CORTEX.COMPLETE`) with explicit reasoning explanations and Cortex Search RAG over official SOPs.
+- Grounded responses powered by **Snowflake Cortex LLM** (`SNOWFLAKE.CORTEX.COMPLETE` & `SNOWFLAKE.CORTEX.AGENT_RUN`) with explicit reasoning explanations and Cortex Search RAG over official SOPs.
 - Session transcript history stored in Snowflake `chat_history`.
 
 ### 🗺️ 2. Dynamic GIS Disaster Map
@@ -177,7 +182,7 @@ SENTINEL_AI_DB.PUBLIC
 | Layer | Technology | Key Capabilities |
 | :--- | :--- | :--- |
 | **AI Copilot Orchestration** | **Snowflake CoCo CLI** | Agent Skills specification (`agent.yaml`), domain constraints, and workflow routing. |
-| **LLM & Search Platform** | **Snowflake Cortex** | `SNOWFLAKE.CORTEX.COMPLETE` & `SEARCH_PREVIEW` for SOP RAG retrieval. |
+| **LLM & Search Platform** | **Snowflake Cortex** | `SNOWFLAKE.CORTEX.COMPLETE`, `AGENT_RUN`, and Cortex Search for SOP RAG retrieval. |
 | **Data Platform** | **Snowflake DB** | Centralized operational telemetry, census data, spatial coordinates, and audit logs. |
 | **Backend API** | **FastAPI (Python 3.12)** | Asynchronous REST endpoints, WebSockets, Structlog, and Pydantic validation. |
 | **Background Processing** | **Celery & Redis** | Asynchronous weather ingestion worker tasks with idempotency & retry protection. |
@@ -192,12 +197,19 @@ SENTINEL_AI_DB.PUBLIC
 ```text
 sentinel/
 ├── README.md                 # Product documentation & setup guide
-├── coco/
-│   └── agent.yaml            # Snowflake CoCo CLI Agent & Skills specification
+├── .cortex/
+│   └── agents/
+│       └── SentinelAI.yaml   # Snowflake Cortex / CoCo CLI Agent & Skills specification
 ├── snowflake/
-│   ├── schema.sql            # Snowflake DB tables & initial schema setup
-│   ├── seed.sql              # Telemetry & census seed dataset
-│   └── select.sql            # Analytical verification queries
+│   ├── setup.sh              # Automated Snowflake setup shell script
+│   ├── setup_1_schema.sql    # Step 1: Database schema DDL setup
+│   ├── setup_2_seed.sql      # Step 2: Initial telemetry & census seed data
+│   ├── setup_3_cortex_search.sql # Step 3: SOP table & Cortex Search Service setup
+│   ├── setup_4_semantic_view.sql # Step 4: Semantic View DDL for Cortex Analyst Text-to-SQL
+│   ├── setup_5_cortex_agent.sql  # Step 5: Cortex Agent DDL with staged skills & tool specifications
+│   ├── pat_auth.sql          # Optional PAT authentication policy & token creation
+│   ├── select.sql            # Verification & validation SQL queries
+│   └── skills/               # Individual SKILL.md definition directories
 ├── backend/
 │   ├── pyproject.toml        # Python dependencies (managed via uv)
 │   ├── tests/                # Pytest suite
@@ -225,12 +237,23 @@ sentinel/
 - **Node.js**: `v18+` and `npm`
 - **Snowflake Account**: *(Optional for production Cortex LLM execution; offline mock fallback is included out of the box)*
 
----
+### Step 1: Database & Cortex Agent Setup (Snowflake Worksheets or SnowSQL CLI)
 
-### Step 1: Database Setup (Snowflake)
-1. Log into your Snowflake Worksheets interface.
-2. Run [`snowflake/schema.sql`](snowflake/schema.sql) to initialize database tables.
-3. Run [`snowflake/seed.sql`](snowflake/seed.sql) to populate initial telemetry, barangays, evacuation centers, and hospitals.
+Execute the setup scripts in sequential order inside your **Snowflake Worksheets / Dashboard**, or run the automated shell script via SnowSQL CLI:
+
+```bash
+./snowflake/setup.sh
+```
+
+**Manual Execution Order (Snowsight Worksheets):**
+
+1. **Schema Setup**: Run [`snowflake/setup_1_schema.sql`](snowflake/setup_1_schema.sql) to initialize `SENTINEL_AI_DB` database, schema, and operational tables.
+2. **Seed Data**: Run [`snowflake/setup_2_seed.sql`](snowflake/setup_2_seed.sql) to populate initial telemetry, barangay census metrics, evacuation centers, and hospital beds.
+3. **PAT Authentication Setup**: Run [`snowflake/setup_3_pat_auth.sql`](snowflake/setup_3_pat_auth.sql) to configure authentication policy (`pat_auth_policy`) and generate Programmatic Access Tokens for Cortex CLI.
+4. **Cortex Search**: Run [`snowflake/setup_4_cortex_search.sql`](snowflake/setup_4_cortex_search.sql) to set up SOP reference tables and create `SENTINEL_SOP_SEARCH_SERVICE`.
+5. **Semantic View**: Run [`snowflake/setup_5_semantic_view.sql`](snowflake/setup_5_semantic_view.sql) to create `SENTINEL_SEMANTIC_VIEW` for Cortex Analyst Text-to-SQL querying.
+6. **Cortex Agent**: Run [`snowflake/setup_6_cortex_agent.sql`](snowflake/setup_6_cortex_agent.sql) to stage skills and create the `SentinelAI` Cortex Agent.
+7. **Verify Installation**: Run [`snowflake/setup_7_select.sql`](snowflake/setup_7_select.sql) to test telemetry, RAG search preview, and Cortex Agent execution.
 
 ---
 

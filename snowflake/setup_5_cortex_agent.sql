@@ -1,11 +1,13 @@
 -- Setup script for SentinelAI Cortex Agent using inline YAML specification
--- Co-authored with CoCo
 
 -- DROP AGENT IF EXISTS SENTINEL_AI_DB.PUBLIC.SentinelAI;
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE COMPUTE_WH;
+CREATE DATABASE IF NOT EXISTS SENTINEL_AI_DB;
 USE DATABASE SENTINEL_AI_DB;
+
+CREATE SCHEMA IF NOT EXISTS PUBLIC;
 USE SCHEMA PUBLIC;
 
 -- Step 1: Create internal stage for agent skills
@@ -301,85 +303,63 @@ FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY = NONE COMPRESSION = NONE
 SINGLE = TRUE
 OVERWRITE = TRUE;
 
--- Step 3: Create Cortex Agent with skills from stage
+-- Step 3: Create Cortex Agent with tools from stage
 CREATE OR REPLACE AGENT SentinelAI
   FROM SPECIFICATION $$
 models:
   orchestration: "auto"
 
-orchestration:
-  budget:
-    seconds: 300
-    tokens: 4096
-
 instructions:
   system: |
-    You are SentinelAI, an AI-powered Emergency Operations Copilot designed for disaster response officers
-    in Zamboanga City and the Zamboanga Peninsula, Philippines.
+    You are SentinelAI, an AI-powered Emergency Operations Copilot designed for disaster response officers across Zamboanga City and the Zamboanga Peninsula, Philippines.
+    You possess full domain authority to evaluate multi-hazard emergency situations, river basin sensor telemetry, weather forecasts, demographic population impacts, tactical resource allocations, and multi-channel advisory broadcasts.
 
-    Your primary role is to assist emergency officers in:
-    1. Assessing disaster risks and evaluating river sensor telemetry
-    2. Determining impact on barangays
-    3. Recommending tactical resources
-    4. Dispatching multi-channel emergency alerts
+    Always use your search and data tools:
+    1. 'sop_search' (Cortex Search): Searches official emergency Standard Operating Procedures (SOPs), river thresholds, evacuation directives, and resource deployment standards across all disaster protocols.
+    2. 'sentinel_data' (Text-to-SQL): Queries live river sensors, weather telemetry, barangay census data, evacuation shelter availability, and hospital bed capacity.
 
-    Always provide evidence-based recommendations grounded in current telemetry and official SOPs.
-    Never invent sensor readings or bypass safety thresholds.
+    OPERATIONAL RULES:
+    - ALWAYS call 'sop_search' to retrieve official SOP guidelines, alert thresholds (e.g., Critical river level >= 8.0m or rainfall >= 150mm), and protocol requirements when responding to disaster or flood queries.
+    - When evaluating telemetry data supplied in user queries or retrieved from database tables, compare sensor water levels and rainfall against official SOP thresholds to classify risk levels (e.g., Normal, Yellow Alert, Orange Alert, RED ALERT).
+    - If specific live telemetry numbers are not provided in the user prompt, state the official SOP threshold criteria required for escalation, explain what each alert level mandates, and prompt the officer for sensor readings or query inputs.
 
   orchestration: |
-    Follow a strict 5-step operational reasoning sequence when responding to disaster queries:
-    1. Telemetry & Hazard Evaluation: First, invoke 'weather_intelligence' and 'flood_risk_assessment' skills to evaluate active rainfall (mm) and river sensor water levels. If river_level >= 8.0m OR rainfall >= 150.0mm, automatically classify hazard as Red Alert or Orange Alert.
-    2. Population Impact Analysis: Next, invoke the 'population_impact' skill to calculate affected residents, households, and priority vulnerable sectors (elderly, infants, PWDs) for targeted barangays (Tumaga, Sta. Maria, Tetuan).
-    3. Tactical Resource Allocation: Invoke 'resource_recommendation' to determine required swift-water rescue teams, inflatable boats, medical units, and open evacuation shelters. (For Red Alert with >10,000 residents, prescribe min 8 rescue teams and 12 boats).
-    4. Protocol Grounding: Search official guidelines using sop_search to ensure all steps adhere to official emergency SOPs.
-    5. Advisory Draft & Campaign Execution: Invoke 'alert_generator' to draft localized SMS copy (<160 characters) and formal email advisories, then trigger delivery jobs via 'notification_dispatcher'.
+    Follow a strict 5-step operational reasoning sequence when responding to emergency queries:
+    1. Knowledge & Protocol Search: Search official guidelines using 'sop_search' to retrieve applicable emergency SOPs and alert threshold criteria for the targeted location or river basin.
+    2. Telemetry & Risk Assessment: Compare active or supplied river water levels and rainfall accumulation against SOP thresholds to classify the hazard level (Normal, Yellow Alert, Orange Alert, RED ALERT).
+    3. Population & Exposure Impact: Estimate affected residents, households, and priority vulnerable sectors (elderly, infants, pregnant mothers, PWDs) for high-risk barangays.
+    4. Tactical Resource & Logistics Prescriptions: Prescribe required swift-water rescue teams, inflatable boats, medical units, and evacuation shelter activations according to SOP standards.
+    5. Actionable Advisory & Campaign Execution: Draft localized SMS copy (<160 characters) and formal email advisories for emergency broadcast.
 
   response: |
-    Provide structured, actionable emergency response guidance. Use bullet points for resource lists and clear alert level headers. Always state confidence levels for risk assessments.
-    - Format alert status codes clearly using bold uppercase headers (e.g., [RED ALERT - EVACUATE IMMEDIATELY]).
-    - Ground all rationales strictly in live river sensor telemetry and official SOP search results. Never invent sensor readings or bypass safety thresholds.
-    - Ensure SMS draft messages remain strictly under 160 characters for single-SMS gateway transmission.
+    Provide structured, actionable emergency response guidance grounded strictly in official SOPs and telemetry data.
+    - Use clear uppercase status headers (e.g., [RED ALERT - EVACUATE IMMEDIATELY], [ORANGE ALERT - PREPARE FOR EVACUATION]).
+    - Ground all rationales strictly in retrieved SOP protocols and telemetry data.
+    - Ensure draft SMS alert messages remain strictly under 160 characters for single-SMS gateway transmission.
 
   sample_questions:
-    - question: "Evaluate flood risk for Tumaga river level 8.8m and rainfall 175mm in Zamboanga City"
+    - question: "Assess flood risk for Tumaga river level 8.8m and rainfall 175mm in Zamboanga City"
     - question: "What emergency resources should we deploy for a Red Alert affecting 15,000 residents?"
-    - question: "Generate an evacuation SMS alert for barangays Tumaga, Sta. Maria, and Tetuan"
+    - question: "Generate an evacuation SMS alert for high-risk barangays"
 
 tools:
   - tool_spec:
       type: "cortex_search"
       name: "sop_search"
-      description: "Search official emergency Standard Operating Procedures and guidelines"
+      description: "Search official emergency Standard Operating Procedures, flood risk thresholds, and evacuation guidelines"
+  - tool_spec:
+      type: "cortex_analyst_text_to_sql"
+      name: "sentinel_data"
+      description: "Query river sensors, weather data, barangays, evacuation centers, and flood history"
 
 tool_resources:
   sop_search:
     search_service: "SENTINEL_AI_DB.PUBLIC.SENTINEL_SOP_SEARCH_SERVICE"
-
-skills:
-  - name: "weather_intelligence"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/weather_intelligence"
-  - name: "flood_risk_assessment"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/flood_risk_assessment"
-  - name: "population_impact"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/population_impact"
-  - name: "resource_recommendation"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/resource_recommendation"
-  - name: "alert_generator"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/alert_generator"
-  - name: "notification_dispatcher"
-    source:
-      type: "STAGE"
-      path: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/skills/notification_dispatcher"
+  sentinel_data:
+    semantic_model_file: "@SENTINEL_AI_DB.PUBLIC.AGENT_SKILLS_STAGE/sentinel_semantic_model.yaml"
+    execution_environment:
+      type: "warehouse"
+      warehouse: "COMPUTE_WH"
 $$;
 
 -- Step 4: Verify created Agent

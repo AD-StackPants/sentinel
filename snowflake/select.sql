@@ -1,6 +1,11 @@
 -- Sentinel AI - Snowflake Verification & Testing Queries
 
+USE ROLE ACCOUNTADMIN;
+USE WAREHOUSE COMPUTE_WH;
+CREATE DATABASE IF NOT EXISTS SENTINEL_AI_DB;
 USE DATABASE SENTINEL_AI_DB;
+
+CREATE SCHEMA IF NOT EXISTS PUBLIC;
 USE SCHEMA PUBLIC;
 
 -- 1. Active Weather & Meteorological Overview
@@ -92,8 +97,15 @@ SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
     '{"query": "evacuation thresholds", "columns": ["content"]}'
 );
 
--- 10. Snowflake Cortex Agent Execution Verification (SentinelAI Skills)
+-- 10. Snowflake Cortex Agent Execution Verification
+-- Test A: Real-time Telemetry & Threshold Evaluation (River Level: 8.8m, Rainfall: 175mm)
 SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
-    '{"agent": "SentinelAI", "messages": [{"role": "user", "content": [{"type": "text", "text": "Assess flood risk for Tumaga river level 8.8m and rainfall 175mm"}]}]}',
+    '{"agent": "SentinelAI", "tools": [{"tool_spec": {"type": "cortex_search", "name": "sop_search"}}], "tool_resources": {"sop_search": {"search_service": "SENTINEL_AI_DB.PUBLIC.SENTINEL_SOP_SEARCH_SERVICE"}}, "messages": [{"role": "user", "content": [{"type": "text", "text": "Assess flood risk for Tumaga river level 8.8m and rainfall 175mm"}]}]}',
     FALSE
-) AS agent_response;
+) AS telemetry_eval_response;
+
+-- Test B: General Operational Status Inquiry
+SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
+    '{"agent": "SentinelAI", "tools": [{"tool_spec": {"type": "cortex_search", "name": "sop_search"}}], "tool_resources": {"sop_search": {"search_service": "SENTINEL_AI_DB.PUBLIC.SENTINEL_SOP_SEARCH_SERVICE"}}, "messages": [{"role": "user", "content": [{"type": "text", "text": "Assess current status of Tumaga river"}]}]}',
+    FALSE
+) AS status_inquiry_response;
