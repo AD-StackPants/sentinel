@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.core.auth import get_current_user
 from app.services.audit_service import audit_service
 from app.services.job_execution_service import JobExecutionService
 
@@ -27,10 +28,15 @@ class JobStatus(BaseModel):
 
 
 @router.post("/", response_model=JobStatus)
-async def create_job(job: JobCreate, service: JobExecutionService = Depends(get_job_service)):
+async def create_job(
+    job: JobCreate,
+    user: dict = Depends(get_current_user),
+    service: JobExecutionService = Depends(get_job_service),
+):
     job_id = await service.create_job(job.messages, job.channels, job.recipients_filter)
     audit_service.log_audit_event(
-        f"Queueing Broadcast Job to Notification Engine: {job_id}", "system_execution"
+        f"Verified Commander ({user.get('email')}) Queued Broadcast Job: {job_id}",
+        "user_approval",
     )
     return JobStatus(job_id=job_id, status="queued", logs=[])
 

@@ -166,6 +166,11 @@ SENTINEL_AI_DB.PUBLIC
 - Automatically persisted to Snowflake `audit_logs`.
 - One-click **JSON Incident Report Exporter** for post-disaster agency debriefs.
 
+### 🔒 6. Security & Authentication Architecture
+- **Firebase Google OAuth 2.0 Integration**: Authenticates emergency response commanders using Firebase Google Auth popup (`signInWithPopup`).
+- **FastAPI Route Protection Dependency**: REST endpoints (e.g. `@router.post("/")` in [`backend/app/api/jobs.py`](backend/app/api/jobs.py)) enforce token verification via `get_current_user` dependency in [`backend/app/core/auth.py`](backend/app/core/auth.py).
+- **Public & Private Flow Isolation**: Unauthenticated visitors explore the landing page and EOC Workflow Simulator without triggering backend database queries or WebSocket connections. Authenticated commanders gain access to live telemetry, real-time map updates, and dispatch capabilities.
+
 ---
 
 ## 🎬 Operational Scenario Walkthrough
@@ -190,6 +195,7 @@ SENTINEL_AI_DB.PUBLIC
 | **Frontend UI** | **React.js (TypeScript)** | Modern EOC layout, Tailwind CSS design tokens, MapLibre GL, Recharts analytics. |
 | **Real-Time Streaming** | **WebSockets** | Live stream of river sensor updates and job dispatch execution logs. |
 | **Notification Engine** | **Job Execution Engine** | Multi-channel SMS (Twilio gateway mock) & Email (SMTP relay mock) task dispatcher. |
+| **Authentication & Security** | **Firebase Auth & FastAPI Dependency** | Google OAuth 2.0 Sign-In, Firebase Bearer Token verification, and protected FastAPI endpoints. |
 
 ---
 
@@ -304,7 +310,7 @@ uv run celery -A app.core.celery_app worker --loglevel=info
 
 ---
 
-### Step 4: Frontend Setup (React.js)
+### Step 4: Frontend Setup (React.js & Firebase Auth)
 1. Open a new terminal and navigate to the frontend directory:
    ```bash
    cd frontend
@@ -313,11 +319,22 @@ uv run celery -A app.core.celery_app worker --loglevel=info
    ```bash
    npm install
    ```
-3. Run the development server:
+3. Configure environment variables in `frontend/.env` (refer to `frontend/.env.example`):
+   ```env
+   VITE_FIREBASE_API_KEY=your_firebase_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   ```
+4. Run the development server:
    ```bash
    npm run dev
    ```
-4. Access the Operational Dashboard at `http://localhost:5173`.
+5. Access the Sentinel AI Platform at `http://localhost:5173`.
+   - **Unauthenticated Users**: View the interactive 1-way scroll landing page and EOC Workflow Simulator with zero backend database queries.
+   - **Authenticated Commanders**: Click **"SIGN IN WITH GOOGLE"** to authenticate and access the live Command Center Dashboard.
 
 ---
 
