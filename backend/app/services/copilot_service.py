@@ -83,12 +83,7 @@ class CopilotService:
                         f"Question: {query}"
                     )
 
-                sql = f"""
-                    SELECT SNOWFLAKE.CORTEX.COMPLETE(
-                        '{settings.SNOWFLAKE_CORTEX_MODEL}',
-                        %s
-                    )
-                """
+                sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
                 cursor.execute(sql, (final_prompt,))
                 result = cursor.fetchone()
                 logger.info("cortex_execution_successful", result=result)
@@ -194,9 +189,7 @@ class CopilotService:
                     "recommended_actions" (list of 3 string directives)
                     """
 
-                    cortex_sql = (
-                        f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
-                    )
+                    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
                     cursor.execute(cortex_sql, (prompt,))
                     cortex_res = cursor.fetchone()
 
