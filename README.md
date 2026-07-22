@@ -46,41 +46,42 @@ Sentinel AI integrates domain-specific data and decision patterns into a unified
 ## 🏗️ System Architecture
 
 ```text
-       Live Telemetry & Field Feeds
- (Weather APIs, River Sensors, Census, Shelters)
-                      │
-                      ▼
-            ┌──────────────────┐
-            │   Snowflake DB   │
-            │  Data Platform   │
-            └─────────┬────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │   CoCo CLI Copilot     │
-         │  (Cortex LLM & RAG)    │
-         └────────────┬───────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │ Decision Support Engine│
-         │  (Risk & Impact Skills)│
-         └────────────┬───────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │ Human Approval Layer   │
-         │ (Commander Guardrails) │
-         └────────────┬───────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │ Job Execution Engine   │
-         │ (SMS, Email, Retries)  │
-         └────────────┬───────────┘
-                      │
-                      ▼
-          Responders & Communities
+                  ┌─────────────────────────────────────────────────────────┐
+                  │              Live Telemetry Ingestion                   │
+                  │ (Open-Meteo Weather, River Sensors, Barangays, Census)  │
+                  └────────────────────────────┬────────────────────────────┘
+                                               │
+                                               ▼
+                  ┌─────────────────────────────────────────────────────────┐
+                  │                 Snowflake DB Platform                   │
+                  │       (river_sensors, weather_data, SENTINEL_SOPS)      │
+                  └────────────────────────────┬────────────────────────────┘
+                                               │
+                                               ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 FastAPI Backend Service                                      │
+│                                                                                              │
+│   1. Retrieve SOP Context via RAG:                                                           │
+│      SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW('SENTINEL_SOP_SEARCH_SERVICE', %s)                │
+│                                                                                              │
+│   2. Generate Grounded AI Response:                                                          │
+│      SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('claude-3-5-sonnet', %s)                            │
+│                                                                                              │
+│   3. (Optional) Autonomous Multi-Tool Agent:                                                 │
+│      SELECT SNOWFLAKE.CORTEX.AGENT_RUN(%s, FALSE)                                            │
+└──────────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                               │
+                                               ▼
+                  ┌─────────────────────────────────────────────────────────┐
+                  │                Human Operator Guardrail                 │
+                  │             (EOC Command Directive Review)              │
+                  └────────────────────────────┬────────────────────────────┘
+                                               │
+                                               ▼
+                  ┌─────────────────────────────────────────────────────────┐
+                  │             Multi-Channel Job Execution                 │
+                  │         (SMS & Email Public Alert Dispatch)             │
+                  └─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -140,7 +141,7 @@ SENTINEL_AI_DB.PUBLIC
 
 ### 🤖 1. Copilot Intelligence Interface
 - Ask free-form operational questions or use quick-action prompt buttons (*"What is the flood risk?"*, *"What should we do?"*, *"Notify affected residents"*).
-- Grounded responses powered by **Snowflake Cortex LLM** (`SNOWFLAKE.CORTEX.COMPLETE` & `SNOWFLAKE.CORTEX.AGENT_RUN`) with explicit reasoning explanations and Cortex Search RAG over official SOPs.
+- Grounded responses powered by **Snowflake Cortex LLM** (`SNOWFLAKE.CORTEX.AI_COMPLETE` & `SNOWFLAKE.CORTEX.AGENT_RUN`) with explicit reasoning explanations and Cortex Search RAG over official SOPs.
 - Session transcript history stored in Snowflake `chat_history`.
 
 ### 🗺️ 2. Dynamic GIS Disaster Map
@@ -182,7 +183,7 @@ SENTINEL_AI_DB.PUBLIC
 | Layer | Technology | Key Capabilities |
 | :--- | :--- | :--- |
 | **AI Copilot Orchestration** | **Snowflake CoCo CLI** | Agent Skills specification (`agent.yaml`), domain constraints, and workflow routing. |
-| **LLM & Search Platform** | **Snowflake Cortex** | `SNOWFLAKE.CORTEX.COMPLETE`, `AGENT_RUN`, and Cortex Search for SOP RAG retrieval. |
+| **LLM & Search Platform** | **Snowflake Cortex** | `SNOWFLAKE.CORTEX.AI_COMPLETE`, `AGENT_RUN`, and Cortex Search for SOP RAG retrieval. |
 | **Data Platform** | **Snowflake DB** | Centralized operational telemetry, census data, spatial coordinates, and audit logs. |
 | **Backend API** | **FastAPI (Python 3.12)** | Asynchronous REST endpoints, WebSockets, Structlog, and Pydantic validation. |
 | **Background Processing** | **Celery & Redis** | Asynchronous weather ingestion worker tasks with idempotency & retry protection. |
