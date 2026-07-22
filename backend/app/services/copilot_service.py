@@ -66,11 +66,22 @@ class CopilotService:
                 except Exception as rag_e:
                     logger.warning("cortex_search_preview_unavailable", error=str(rag_e))
 
-                # Append context to query if found
+                location_context = (
+                    f"{settings.DEFAULT_JURISDICTION_CITY}, {settings.DEFAULT_JURISDICTION_REGION}"
+                )
+
                 if context_str:
-                    final_prompt = f"Context from SOP: {context_str}\n\nQuestion: {query}"
+                    final_prompt = (
+                        f"Target Jurisdiction: {location_context}\n"
+                        f"Context from SOP: {context_str}\n\n"
+                        f"Question: {query}"
+                    )
                 else:
-                    final_prompt = f"You are an Emergency Operations AI Copilot for {settings.DEFAULT_JURISDICTION_CITY}. Answer concisely based on current telemetry.\nQuestion: {query}"
+                    final_prompt = (
+                        f"Target Jurisdiction: {location_context}\n"
+                        f"Answer concisely based on current telemetry.\n\n"
+                        f"Question: {query}"
+                    )
 
                 sql = f"""
                     SELECT SNOWFLAKE.CORTEX.COMPLETE(
