@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
 from app.core.config import settings
+from app.core.rate_limit import RateLimitMiddleware
 from app.services.telemetry_service import telemetry_service
 
 
@@ -30,6 +31,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=20,     # Max 20 requests
+    window_seconds=300,  # Per 5-minute interval
 )
 
 app.include_router(api_router, prefix="/api/v1")
