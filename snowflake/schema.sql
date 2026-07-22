@@ -100,3 +100,12 @@ CREATE OR REPLACE TABLE chat_history (
     metadata VARIANT,
     created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
+
+-- Standard Operating Procedures (SOP) table for Cortex Search
+CREATE OR REPLACE TABLE SENTINEL_SOPS (
+    id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(255),
+    category VARCHAR(100),
+    content TEXT,
+    created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
