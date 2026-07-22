@@ -91,3 +91,9 @@ SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
     'SENTINEL_SOP_SEARCH_SERVICE',
     '{"query": "evacuation thresholds", "columns": ["content"]}'
 );
+
+-- 10. Snowflake Cortex Agent Execution Verification (SentinelAI Skills)
+SELECT SNOWFLAKE.CORTEX.AGENT_RUN(
+    '{"agent": "SentinelAI", "messages": [{"role": "user", "content": [{"type": "text", "text": "Assess flood risk for Tumaga river level 8.8m and rainfall 175mm"}]}]}',
+    FALSE
+) AS agent_response;
