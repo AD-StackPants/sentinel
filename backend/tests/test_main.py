@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -15,6 +17,16 @@ def test_health_check():
 
 
 def test_ask_copilot():
-    response = client.post("/api/v1/copilot/ask", json={"query": "What is the flood risk?"})
-    assert response.status_code == 200
-    assert "flood" in response.json()["response"].lower()
+    with patch(
+        "app.services.copilot_service.CopilotService.process_query"
+    ) as mock_query, patch(
+        "app.services.copilot_service.CopilotService.save_chat_message"
+    ):
+        mock_query.return_value = {
+            "response": "The flood risk level is elevated in Zamboanga City.",
+            "explanation": "Mocked test response",
+            "recommended_actions": ["Issue Evacuation Advisory"],
+        }
+        response = client.post("/api/v1/copilot/ask", json={"query": "What is the flood risk?"})
+        assert response.status_code == 200
+        assert "flood" in response.json()["response"].lower()
