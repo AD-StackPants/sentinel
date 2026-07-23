@@ -1,11 +1,14 @@
 import logging
 from datetime import datetime
-
+import json
 import httpx
 import snowflake.connector
+import structlog
+import asyncio
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.services.copilot_service import CopilotService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -26,6 +29,110 @@ def _get_snowflake_conn():
         schema=settings.SNOWFLAKE_SCHEMA,
         role=settings.SNOWFLAKE_ROLE,
     )
+
+
+def fast_path_trigger(rainfall_val: float, updated_level: float, cursor):
+    if updated_level >= 8.0 or rainfall_val >= 150.0:
+        logger.info(
+            f"Fast-path trigger condition met! Rainfall: {rainfall_val}, Water level: {updated_level}"
+        )
+        copilot = CopilotService()
+        copilot.conn = _get_snowflake_conn()
+
+        # 1. Query Snowflake Cortex Search for SOP rules
+        sop_query = "flood evacuation and responder staging SOP rules"
+        try:
+            search_config = {"query": sop_query, "columns": ["content"]}
+            rag_sql = """
+                SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                    'SENTINEL_SOP_SEARCH_SERVICE',
+                    %s
+                )
+            """
+            cursor.execute(rag_sql, (json.dumps(search_config),))
+            rag_result = cursor.fetchone()
+
+            context_str = ""
+            if rag_result and len(rag_result) > 0 and rag_result[0]:
+                results_json = json.loads(str(rag_result[0]))
+                if "results" in results_json:
+                    context_str = " ".join([r.get("content", "") for r in results_json["results"]])
+
+            # 2. Feed context to AI Complete
+            ai_prompt = (
+                f"Context from SOP: {context_str}\n\n"
+                f"Based on the SOP, generate a Localized Public Advisory Copy (SMS under 160 chars + HTML Email) "
+                f"and a Technical First Responder Staging Alert ('STAND BY & GEAR UP: Deploy crews to staging stations'). "
+                f'Respond with JSON format: {{"sms": "<sms text>", "email": "<email text>", "responder_alert": "<alert text>"}}'
+            )
+
+            sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('{settings.SNOWFLAKE_CORTEX_MODEL}', %s)"
+            cursor.execute(sql, (ai_prompt,))
+            result = cursor.fetchone()
+
+            ai_response = str(result[0]) if result and len(result) > 0 and result[0] else ""
+
+            if ai_response.startswith('"') and ai_response.endswith('"'):
+                try:
+                    ai_response = json.loads(ai_response)
+                except Exception:
+                    ai_response = ai_response[1:-1]
+
+            json_match = __import__("re").search(r"\{.*\}", ai_response, __import__("re").DOTALL)
+            ai_data = {}
+            if json_match:
+                try:
+                    cleaned_json = json_match.group().strip()
+                    ai_data = json.loads(cleaned_json)
+                except Exception:
+                    pass
+
+            sms_text = ai_data.get("sms", "EMERGENCY: Flood warning. Evacuate now.")
+            email_text = ai_data.get(
+                "email", "<h1>EMERGENCY FLOOD WARNING</h1><p>Please evacuate.</p>"
+            )
+            responder_alert = ai_data.get(
+                "responder_alert",
+                "STAND BY & GEAR UP: Deploy crews to staging stations in Tumaga / Sta. Maria",
+            )
+
+            # 3. Log into audit_logs
+            cursor.execute(
+                """
+                INSERT INTO audit_logs (event, event_type)
+                VALUES (%s, %s)
+                """,
+                (f"SOP MATCH: {context_str[:200]}...", "fast_path_execution"),
+            )
+
+            # 4. Trigger JobExecutionService internally
+            try:
+                from app.api.jobs import job_service
+                import asyncio
+
+                messages = [sms_text, email_text, responder_alert]
+
+                # job_service is a singleton used in API
+                # create_job is async
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                job_id = loop.run_until_complete(
+                    job_service.create_job(
+                        messages=messages,
+                        channels=["sms", "email"],
+                        recipients_filter="high_risk_zones",
+                    )
+                )
+                logger.info(f"Triggered Fast-Path Auto Alert System internally. Job ID: {job_id}")
+            except Exception as e:
+                logger.error(f"Failed to post internal job: {e}")
+
+        except Exception as e:
+            logger.error(f"Fast-path execution failed: {e}")
 
 
 @celery_app.task(
@@ -132,9 +239,12 @@ def fetch_and_store_live_weather_task(self):
         active_sensors = cursor.fetchall()
 
         sensor_count = 0
+        max_updated_level = 0
         for idx, (s_id, base_level) in enumerate(active_sensors):
             surge_offset = round(rainfall_val / (100.0 + (idx * 5)), 1)
             updated_level = round(float(base_level or 6.0) + surge_offset, 1)
+            if updated_level > max_updated_level:
+                max_updated_level = updated_level
             # Recompute alert_level per SOP thresholds so the DB column stays current
             if updated_level >= 8.0:
                 computed_alert = "RED ALERT"
@@ -147,6 +257,8 @@ def fetch_and_store_live_weather_task(self):
                 (updated_level, computed_alert, s_id),
             )
             sensor_count += 1
+
+        fast_path_trigger(rainfall_val, max_updated_level, cursor)
 
         # Log Celery ingestion task event in Snowflake audit_logs table
         cursor.execute(

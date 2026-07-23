@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user
@@ -34,12 +34,20 @@ async def create_job(
     user: dict = Depends(get_current_user),
     service: JobExecutionService = Depends(get_job_service),
 ):
-    job_id = await service.create_job(job.messages, job.channels, job.recipients_filter)
-    audit_service.log_audit_event(
-        f"Verified Commander ({user.get('token')}) Queued Broadcast Job: {job_id}",
-        "user_approval",
-    )
-    return JobStatus(job_id=job_id, status="queued", logs=[], counts={"sms": 0, "email": 0})
+    try:
+        job_id = await service.create_job(job.messages, job.channels, job.recipients_filter)
+        audit_service.log_audit_event(
+            f"Verified Commander ({user.get('token')}) Queued Broadcast Job: {job_id}",
+            "user_approval",
+        )
+        return JobStatus(job_id=job_id, status="queued", logs=[], counts={"sms": 0, "email": 0})
+    except ValueError as e:
+        # Check if the error is due to idempotency / duplication
+        if "Duplicate job submission" in str(
+            e
+        ) or "Failed to queue job due to atomic state check" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{job_id}", response_model=JobStatus)

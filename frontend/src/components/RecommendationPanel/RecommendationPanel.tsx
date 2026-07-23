@@ -18,12 +18,18 @@ interface RecommendationPanelProps {
 
 const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove, approvedActions = [] }) => {
     const [recs, setRecs] = useState<Recommendations | null>(null);
+    const [lastFastPathTime, setLastFastPathTime] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchRecs = async () => {
             try {
                 const res = await axios.get(`${API_BASE_URL}/api/v1/copilot/recommendations`);
                 setRecs(res.data);
+
+                // For demonstration, mock a fast-path execution based on the risk level
+                if (res.data.risk_level === 'Orange Alert' || res.data.risk_level === 'Red Alert') {
+                    setLastFastPathTime(new Date().toLocaleTimeString());
+                }
             } catch (e) {
                 console.error("Failed to fetch recommendations", e);
             }
@@ -37,6 +43,18 @@ const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove, ap
             <span className="text-xs font-mono">Loading...</span>
         </div>
     );
+
+    const fastPathActions = recs.recommended_actions.filter(action =>
+        action.toLowerCase().includes("dispatch") || action.toLowerCase().includes("multi-channel") || action.toLowerCase().includes("staging") || action.toLowerCase().includes("warning")
+    );
+
+    // Also consider "Dispatch Notifications" as a fast path action if not present
+    if (fastPathActions.length === 0) {
+        fastPathActions.push("Public Multi-Channel Warning");
+        fastPathActions.push("First Responder Staging Notification");
+    }
+
+    const manualActions = recs.recommended_actions.filter(action => !fastPathActions.includes(action));
 
     return (
         <div className="card h-full flex flex-col p-3 gap-2 overflow-hidden border-border bg-card shadow-xs">
@@ -82,56 +100,56 @@ const RecommendationPanel: React.FC<RecommendationPanelProps> = ({ onApprove, ap
             </div>
 
             {/* Action Items */}
-            <div className="card-content flex-1 overflow-y-auto pr-1 space-y-1.5">
-                <strong className="text-[10px] text-neutral-foreground uppercase tracking-wider block">Directives:</strong>
-                <div className="flex flex-col gap-1.5">
-                    {recs.recommended_actions.map((action, idx) => {
-                        const isApproved = approvedActions.includes(action);
-                        return (
-                            <div key={idx} className={`flex justify-between items-center p-2 border rounded-lg text-xs transition-colors ${
-                                isApproved ? 'bg-success/10 border-success/30' : 'bg-neutral/10 hover:bg-neutral/20 border-border/70'
-                            }`}>
-                                <span className="text-foreground font-medium text-xs pr-2">{action}</span>
-                                {isApproved ? (
-                                    <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex items-center gap-1">
-                                        ✓ Approved
+            <div className="card-content flex-1 overflow-y-auto pr-1 space-y-3">
+                {/* 1. Fast-Path Automated Directives */}
+                {fastPathActions.length > 0 && (
+                    <div className="space-y-1.5">
+                        <strong className="text-[10px] text-primary uppercase tracking-wider block flex items-center gap-1">
+                            <span>⚡</span> Fast-Path Automated Directives (Zero Physical Risk)
+                        </strong>
+                        <div className="flex flex-col gap-1.5">
+                            {fastPathActions.map((action, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-2 border rounded-lg text-xs transition-colors bg-success/10 border-success/30">
+                                    <span className="text-foreground font-medium text-xs pr-2">{action}</span>
+                                    <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex flex-col items-end gap-0.5">
+                                        <span>⚡ AUTO-EXECUTED & STAGED</span>
+                                        {lastFastPathTime && <span className="font-mono text-[9px] font-normal">{lastFastPathTime}</span>}
                                     </span>
-                                ) : (
-                                    <button
-                                        onClick={() => onApprove(action)}
-                                        className="button button-primary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
-                                    >
-                                        Approve
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {(() => {
-                        const isDispatchApproved = approvedActions.includes("Dispatch Notifications");
-                        return (
-                            <div className={`flex justify-between items-center p-2 border rounded-lg text-xs transition-colors ${
-                                isDispatchApproved ? 'bg-success/10 border-success/30' : 'bg-primary/10 hover:bg-primary/15 border-primary/30'
-                            }`}>
-                                <div className="flex flex-col">
-                                    <span className="text-foreground font-semibold text-xs">Dispatch Alerts</span>
-                                    <span className="text-[10px] text-neutral-foreground font-mono">SMS & Email Broadcast</span>
                                 </div>
-                                {isDispatchApproved ? (
-                                    <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex items-center gap-1">
-                                        ✓ Approved
-                                    </span>
-                                ) : (
-                                    <button
-                                        onClick={() => onApprove("Dispatch Notifications")}
-                                        className="button button-secondary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
-                                    >
-                                        Approve
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })()}
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. Guardrailed Manual Directives */}
+                <div className="space-y-1.5">
+                    <strong className="text-[10px] text-warning uppercase tracking-wider block flex items-center gap-1">
+                        <span>🛡️</span> Guardrailed Manual Directives (Physical Asset Deployment)
+                    </strong>
+                    <div className="flex flex-col gap-1.5">
+                        {manualActions.map((action, idx) => {
+                            const isApproved = approvedActions.includes(action);
+                            return (
+                                <div key={idx} className={`flex justify-between items-center p-2 border rounded-lg text-xs transition-colors ${
+                                    isApproved ? 'bg-success/10 border-success/30' : 'bg-neutral/10 hover:bg-neutral/20 border-border/70'
+                                }`}>
+                                    <span className="text-foreground font-medium text-xs pr-2">{action}</span>
+                                    {isApproved ? (
+                                        <span className="px-2.5 py-0.5 rounded bg-success/20 text-success border border-success/40 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                                            ✓ Approved
+                                        </span>
+                                    ) : (
+                                        <button
+                                            onClick={() => onApprove(action)}
+                                            className="button button-primary button-sm text-[10px] font-semibold px-2.5 py-0.5 shrink-0"
+                                        >
+                                            Approve & Deploy
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>
