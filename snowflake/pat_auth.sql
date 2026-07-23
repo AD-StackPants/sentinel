@@ -13,8 +13,9 @@ CREATE OR REPLACE AUTHENTICATION POLICY pat_auth_policy
   CLIENT_TYPES = ('SNOWFLAKE_UI', 'DRIVERS')
   SECURITY_INTEGRATIONS = ('ALL');
 
--- Assign authentication policy to user (replace ZEREXEI with your Snowflake username if different)
-ALTER USER ZEREXEI SET AUTHENTICATION POLICY = pat_auth_policy;
+-- Generate Programmatic Access Token for Cortex CLI
+ALTER USER ZEREXEI REMOVE PROGRAMMATIC ACCESS TOKEN IF EXISTS cortex_cli_pat;
+ALTER USER ZEREXEI ADD PROGRAMMATIC ACCESS TOKEN cortex_cli_pat DAYS_TO_EXPIRY = 30;
 
 -- Generate Programmatic Access Token for Cortex CLI
 ALTER USER IF EXISTS ZEREXEI ADD PROGRAMMATIC ACCESS TOKEN cortex_cli_pat DAYS_TO_EXPIRY = 30;
