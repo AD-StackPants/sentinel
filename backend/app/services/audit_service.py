@@ -40,7 +40,7 @@ class AuditService:
             except Exception as e:
                 logger.error("failed_to_persist_audit_log", error=str(e))
         else:
-            logger.info("mock_audit_log", event=event, type=event_type)
+            logger.info("mock_audit_log", audit_event=event, event_type=event_type)
 
     def get_approved_directives(self) -> list[str]:
         if self.conn:

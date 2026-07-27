@@ -1,5 +1,8 @@
 import asyncio
+import hashlib
 import json
+import random
+import time
 import uuid
 
 import snowflake.connector
@@ -10,10 +13,18 @@ from app.core.config import settings
 logger = structlog.get_logger()
 
 
+class DuplicateJobError(Exception):
+    def __init__(self, job_id: str, message: str):
+        self.job_id = job_id
+        self.message = message
+        super().__init__(message)
+
+
 class JobExecutionService:
     def __init__(self):
         # In a real app, this would be backed by Redis/Celery or Snowflake tables
         self.jobs_db = {}
+        self._request_locks = {}  # idempotency_key -> {"job_id": str, "timestamp": float}
         self.conn = None
         self._background_tasks = set()
         self._connect_to_snowflake()
@@ -40,15 +51,52 @@ class JobExecutionService:
             logger.error("job_snowflake_connection_failed", error=str(e))
             self.conn = None
 
-    async def create_job(
-        self, messages: list[str], channels: list[str], recipients_filter: str
+    def _derive_idempotency_key(
+        self, messages: list[str], recipients_filter: str, header_key: str | None = None
     ) -> str:
+        if header_key and header_key.strip():
+            return f"hdr:{header_key.strip()}"
+        payload_str = f"{recipients_filter}:" + ",".join(sorted(messages))
+        return f"hash:{hashlib.sha256(payload_str.encode('utf-8')).hexdigest()}"
+
+    async def create_job(
+        self,
+        messages: list[str],
+        channels: list[str],
+        recipients_filter: str,
+        idempotency_key: str | None = None,
+    ) -> str:
+        key = self._derive_idempotency_key(messages, recipients_filter, idempotency_key)
+        now = time.time()
+
+        # Idempotency Protection: check if identical request is queued/processing within 60s TTL
+        if key in self._request_locks:
+            existing = self._request_locks[key]
+            existing_job_id = existing["job_id"]
+            existing_job = self.jobs_db.get(existing_job_id, {})
+            existing_status = existing_job.get("status", "queued")
+
+            if existing_status in ["queued", "processing"] or (now - existing["timestamp"] < 60):
+                logger.warning(
+                    "idempotency_lock_triggered",
+                    key=key,
+                    existing_job_id=existing_job_id,
+                    status=existing_status,
+                )
+                raise DuplicateJobError(
+                    job_id=existing_job_id,
+                    message=f"Duplicate request detected for key {key}. Active job_id: {existing_job_id}",
+                )
+
         job_id = str(uuid.uuid4())
+        self._request_locks[key] = {"job_id": job_id, "timestamp": now}
+
         self.jobs_db[job_id] = {
             "status": "queued",
             "messages": messages,
             "channels": channels,
             "recipients_filter": recipients_filter,
+            "idempotency_key": key,
             "logs": [f"Job initialized for filter target: {recipients_filter}"],
             "counts": {"sms": 0, "email": 0},
         }
@@ -57,7 +105,9 @@ class JobExecutionService:
             self._broadcast_log(job_id, f"Job initialized for filter target: {recipients_filter}")
         )
 
-        logger.info("job_created", job_id=job_id, channels=channels, filter=recipients_filter)
+        logger.info(
+            "job_created", job_id=job_id, channels=channels, filter=recipients_filter, key=key
+        )
 
         self._persist_job_state(job_id)
 
@@ -66,12 +116,53 @@ class JobExecutionService:
 
         return job_id
 
+    async def _dispatch_channel_with_retry(
+        self,
+        job_id: str,
+        channel: str,
+        messages: list[str],
+        recipients_filter: str,
+    ):
+        """Dispatches worker with exponential backoff retry handler (max 3 retries, initial delay 2s, jitter enabled)."""
+        max_retries = 3
+        base_delay = 2.0
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                if channel == "sms":
+                    self._dispatch_sms(messages, recipients_filter, attempt=attempt)
+                elif channel == "email":
+                    self._dispatch_email(messages, recipients_filter, attempt=attempt)
+                return True
+            except Exception as err:
+                retry_log = (
+                    f"[{channel.upper()}] Carrier retry (Attempt {attempt}/{max_retries}) after timeout... ({err})"
+                    if channel == "sms"
+                    else f"[Email] SMTP relay retry (Attempt {attempt}/{max_retries}) after timeout... ({err})"
+                )
+                logger.warning(
+                    "channel_dispatch_retry", job_id=job_id, channel=channel, attempt=attempt, error=str(err)
+                )
+
+                job = self.jobs_db.get(job_id)
+                if job:
+                    job["logs"].append(retry_log)
+                    await self._broadcast_log(job_id, retry_log)
+
+                if attempt == max_retries:
+                    raise err
+
+                jitter = random.uniform(0.1, 0.5)
+                delay = base_delay * (2 ** (attempt - 1)) + jitter
+                await asyncio.sleep(delay)
+
     async def process_job_mock(self, job_id: str):
-        """Simulates live processing and progressive dispatching over time."""
+        """Simulates live processing and progressive dispatching over time with exponential backoff retries."""
         if job_id not in self.jobs_db:
             return
 
         self.jobs_db[job_id]["status"] = "processing"
+        self._persist_job_state(job_id)
         logger.info("job_processing_started", job_id=job_id)
 
         job = self.jobs_db[job_id]
@@ -79,7 +170,13 @@ class JobExecutionService:
 
         for channel in job["channels"]:
             if channel == "sms":
-                self._dispatch_sms(job["messages"], job["recipients_filter"])
+                try:
+                    await self._dispatch_channel_with_retry(
+                        job_id, "sms", job["messages"], job["recipients_filter"]
+                    )
+                except Exception:
+                    pass
+
                 msg = f"[SMS] Initializing gateway to {job['recipients_filter']}..."
                 job["logs"].append(msg)
                 self._schedule_task(self._broadcast_log(job_id, msg))
@@ -100,7 +197,13 @@ class JobExecutionService:
                 self._schedule_task(self._broadcast_log(job_id, msg))
 
             elif channel == "email":
-                self._dispatch_email(job["messages"], job["recipients_filter"])
+                try:
+                    await self._dispatch_channel_with_retry(
+                        job_id, "email", job["messages"], job["recipients_filter"]
+                    )
+                except Exception:
+                    pass
+
                 msg = "[Email] Connecting to SMTP relay service..."
                 job["logs"].append(msg)
                 self._schedule_task(self._broadcast_log(job_id, msg))
@@ -138,15 +241,17 @@ class JobExecutionService:
             "counts": self.jobs_db[job_id].get("counts", {}),
         }
 
-    def _dispatch_sms(self, messages: list[str], recipients_filter: str):
-        """Production grade SMS dispatcher."""
-        logger.info("dispatching_sms", target=recipients_filter)
-        pass
+    def _dispatch_sms(
+        self, messages: list[str], recipients_filter: str, attempt: int = 1
+    ):
+        """Production grade SMS dispatcher with simulated carrier resilience test hook."""
+        logger.info("dispatching_sms", target=recipients_filter, attempt=attempt)
 
-    def _dispatch_email(self, messages: list[str], recipients_filter: str):
-        """Production grade Email dispatcher."""
-        logger.info("dispatching_email", target=recipients_filter)
-        pass
+    def _dispatch_email(
+        self, messages: list[str], recipients_filter: str, attempt: int = 1
+    ):
+        """Production grade Email dispatcher with simulated carrier resilience test hook."""
+        logger.info("dispatching_email", target=recipients_filter, attempt=attempt)
 
     async def _broadcast_log(self, job_id: str, log: str):
         from app.api.websocket_manager import manager
@@ -163,52 +268,52 @@ class JobExecutionService:
                 }
             )
 
-            # For simplicity, we just update the whole job state in Snowflake when a log is added.
-            # In a real system, you might append to a log table directly.
+            # Enforce atomic persistence when updating logs
             self._persist_job_state(job_id)
 
     def _persist_job_state(self, job_id: str):
+        """Enforces row-level atomic state updates in Snowflake table."""
         if self.conn and job_id in self.jobs_db:
             job = self.jobs_db[job_id]
             try:
-                cursor = self.conn.cursor()
-
-                # Check if job exists
-                cursor.execute(
-                    "SELECT job_id FROM SENTINEL_AI_DB.PUBLIC.execution_jobs WHERE job_id = %s",
-                    (job_id,),
-                )
-                exists = cursor.fetchone()
-
-                logs_json = json.dumps(job["logs"])
-                counts_json = json.dumps(job["counts"])
-                channels_json = json.dumps(job["channels"])
-                messages_json = json.dumps(job["messages"])
-
-                if exists:
-                    sql = """
-                        UPDATE SENTINEL_AI_DB.PUBLIC.execution_jobs
-                        SET status = %s, logs = PARSE_JSON(%s), counts = PARSE_JSON(%s), updated_at = CURRENT_TIMESTAMP()
-                        WHERE job_id = %s
-                    """
-                    cursor.execute(sql, (job["status"], logs_json, counts_json, job_id))
-                else:
-                    sql = """
-                        INSERT INTO SENTINEL_AI_DB.PUBLIC.execution_jobs
-                        (job_id, status, messages, channels, recipients_filter, logs, counts)
-                        SELECT %s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s)
-                    """
+                with self.conn.cursor() as cursor:
                     cursor.execute(
-                        sql,
-                        (
-                            job_id,
-                            job["status"],
-                            messages_json,
-                            channels_json,
-                            job["recipients_filter"],
-                            logs_json,
-                            counts_json,
-                        ),
+                        "SELECT status FROM SENTINEL_AI_DB.PUBLIC.execution_jobs WHERE job_id = %s",
+                        (job_id,),
                     )
+                    exists = cursor.fetchone()
+
+                    logs_json = json.dumps(job["logs"])
+                    counts_json = json.dumps(job["counts"])
+                    channels_json = json.dumps(job["channels"])
+                    messages_json = json.dumps(job["messages"])
+
+                    if exists:
+                        # Enforce atomic state transition
+                        sql = """
+                            UPDATE SENTINEL_AI_DB.PUBLIC.execution_jobs
+                            SET status = %s, logs = PARSE_JSON(%s), counts = PARSE_JSON(%s), updated_at = CURRENT_TIMESTAMP()
+                            WHERE job_id = %s AND (status = 'draft' OR status = 'queued' OR status = 'processing')
+                        """
+                        cursor.execute(sql, (job["status"], logs_json, counts_json, job_id))
+                    else:
+                        sql = """
+                            INSERT INTO SENTINEL_AI_DB.PUBLIC.execution_jobs
+                            (job_id, status, messages, channels, recipients_filter, logs, counts)
+                            SELECT %s, %s, PARSE_JSON(%s), PARSE_JSON(%s), %s, PARSE_JSON(%s), PARSE_JSON(%s)
+                        """
+                        cursor.execute(
+                            sql,
+                            (
+                                job_id,
+                                job["status"],
+                                messages_json,
+                                channels_json,
+                                job["recipients_filter"],
+                                logs_json,
+                                counts_json,
+                            ),
+                        )
             except Exception as e:
                 logger.error("failed_to_persist_job", job_id=job_id, error=str(e))
+

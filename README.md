@@ -11,16 +11,12 @@
 Instead of operating as a simple alerting interface, Sentinel AI acts as an **AI Copilot** that ingests real-time disaster telemetry, evaluates flood risks against official Standard Operating Procedures (SOPs), calculates population impact radii, recommends tactical resource deployments, and dispatches audited multi-channel public warnings via a resilient Job Execution Engine.
 
 ```
-┌────────────────────────┐      ┌────────────────────────┐      ┌────────────────────────┐
-│   Data Ingestion       │ ───► │    Risk Assessment     │ ───► │   Impact Analysis      │
-│ Weather, Rivers, Census│      │ CoCo CLI & Cortex LLM  │      │ Barangays, Shelters    │
-└────────────────────────┘      └────────────────────────┘      └────────────────────────┘
-                                                                            │
-┌────────────────────────┐      ┌────────────────────────┐                  ▼
-│  Notification Delivery │ ◄─── │     Human Approval     │ ◄─── ┌────────────────────────┐
-│ Job Execution Engine   │      │ Operator Guardrail     │      │ Action Recommendation  │
-└────────────────────────┘      └────────────────────────┘      │ Tactical Directives    │
-                                                                └────────────────────────┘
+[ Data Ingestion ] ──► [ Risk Assessment ] ──► [ Impact Analysis ]
+  Weather, Sensors       CoCo CLI & Cortex      Barangays, Census
+                                                       │
+                                                       ▼
+[ Dispatch Engine ] ◄── [ Tiered Guardrail ] ◄── [ Recommendation ]
+  Automated Fast-Path    Automated vs. Manual   Tactical Directives
 ```
 
 ---
@@ -38,8 +34,9 @@ During natural disasters (typhoons, flash floods, monsoon surges), disaster comm
 ### The Sentinel AI Advantage
 Sentinel AI integrates domain-specific data and decision patterns into a unified operational canvas:
 1. **Real-World Operational Grounding**: Built directly around official disaster response SOPs and incident management workflows.
-2. **Domain-Specific AI Orchestration**: Powered by **Snowflake CoCo CLI** agent skills with hard domain guardrails (e.g. automatic Red Alert triggers when 12-hr rainfall $> 150\text{mm}$ or river levels $\ge 8.0\text{m}$).
-3. **End-to-End Decision Support**: Manages the complete lifecycle from data collection to AI reasoning, human-in-the-loop approval, multi-channel dispatch, and audit logging.
+2. **Automated Fast-Path Telemetry Breach Alerts**: When telemetry breaches critical thresholds (river level $\ge 8.0\text{m}$ or rainfall $\ge 150\text{mm}$), the system automatically queries Snowflake Cortex Search, cites matching SOP sections, and dispatches public advisories & responder staging alerts.
+3. **Tiered Operator Guardrail Architecture**: Distinguishes zero physical risk automated warnings (Fast-Path) from physical asset deployments (Guardrailed Manual Directives requiring 1-click commander validation).
+4. **End-to-End Decision Support**: Manages the complete lifecycle from data collection to AI reasoning, human-in-the-loop approval, multi-channel dispatch, idempotency locking, worker retries, and audit logging.
 
 ---
 
@@ -61,26 +58,29 @@ Sentinel AI integrates domain-specific data and decision patterns into a unified
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 FastAPI Backend Service                                      │
 │                                                                                              │
-│   1. Retrieve SOP Context via RAG:                                                           │
+│   1. Telemetry Breach Check: (water_level >= 8.0m or rainfall >= 150mm)                      │
+│      Trigger Automated Fast-Path SOP RAG Auto-Drafting & Auto-Dispatch                       │
+│                                                                                              │
+│   2. Retrieve SOP Context via Cortex Search:                                                 │
 │      SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW('SENTINEL_SOP_SEARCH_SERVICE', %s)                │
 │                                                                                              │
-│   2. Generate Grounded AI Response:                                                          │
+│   3. Generate Grounded AI Advisory:                                                          │
 │      SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('claude-3-5-sonnet', %s)                            │
-│                                                                                              │
-│   3. (Optional) Autonomous Multi-Tool Agent:                                                 │
-│      SELECT SNOWFLAKE.CORTEX.AGENT_RUN(%s, FALSE)                                            │
 └──────────────────────────────────────────────┬───────────────────────────────────────────────┘
                                                │
                                                ▼
                   ┌─────────────────────────────────────────────────────────┐
-                  │                Human Operator Guardrail                 │
-                  │             (EOC Command Directive Review)              │
+                  │             Tiered Operator Guardrail UI                │
+                  │   ⚡ Fast-Path Automated (Zero Physical Risk)           │
+                  │   🛡️ Guardrailed Manual (Physical Asset Deployment)     │
                   └────────────────────────────┬────────────────────────────┘
                                                │
                                                ▼
                   ┌─────────────────────────────────────────────────────────┐
-                  │             Multi-Channel Job Execution                 │
-                  │         (SMS & Email Public Alert Dispatch)             │
+                  │             Multi-Channel Job Execution Engine            │
+                  │   • Single-Request Idempotency Locks (HTTP 409)         │
+                  │   • Exponential Backoff Retries & Jitter               │
+                  │   • Live WebSocket Streaming to Notification Console     │
                   └─────────────────────────────────────────────────────────┘
 ```
 
@@ -139,47 +139,47 @@ SENTINEL_AI_DB.PUBLIC
 
 ## ⚙️ Core Features & Operational Dashboard
 
-### 🤖 1. Copilot Intelligence Interface
+### ⚡ 1. Automated Fast-Path Alert Trigger
+- **Telemetry Breach Detection**: Automatically triggers when updated river sensor level $\ge 8.0\text{m}$ or rainfall $\ge 150.0\text{mm}$.
+- **SOP RAG Auto-Drafting**: Queries Snowflake Cortex Search (`SENTINEL_SOP_SEARCH_SERVICE`) and feeds context to Cortex AI (`claude-3-5-sonnet`) to generate:
+  - Localized Public Advisory SMS (<160 chars) + HTML Email.
+  - Technical First Responder Staging Alert ("STAND BY & GEAR UP: Deploy crews to staging stations in Tumaga / Sta. Maria").
+  - Cited SOP rule section (logged to `audit_logs` with event type `fast_path_execution`).
+- **Auto-Dispatch**: Automatically dispatches warning jobs without waiting for manual commander input.
+
+### 🛡️ 2. Tiered Operator Guardrail UI
+- **⚡ Fast-Path Automated Directives (Zero Physical Risk)**: Displays Public Multi-Channel Warnings & Responder Staging Notifications as `⚡ AUTO-EXECUTED & STAGED` with live timestamp.
+- **🛡️ Guardrailed Manual Directives (Physical Asset Deployment)**: Displays physical commitment directives (e.g., *"Deploy 6 Inflatable Rescue Boats to Sector 3"*, *"Open Evacuation Gymnasiums"*) requiring explicit 1-Click **Approve & Deploy** commander validation.
+
+### 🔒 3. Single-Request Idempotency Locks & Worker Retries
+- **Anti-Duplicate Protection**: Central request lock cache checking `Idempotency-Key` headers or payload hashes (`recipients_filter` + `messages`). Rejects duplicate submissions with `HTTP 409 Conflict`.
+- **Atomic Database Persistence**: Enforces atomic state transitions in `_persist_job_state`.
+- **Exponential Backoff Retries**: Wraps SMS and Email dispatchers with max 3 retries, 2s base delay, and random jitter, streaming retry logs over WebSockets.
+
+### 🤖 4. Copilot Intelligence Interface
 - Ask free-form operational questions or use quick-action prompt buttons (*"What is the flood risk?"*, *"What should we do?"*, *"Notify affected residents"*).
-- Grounded responses powered by **Snowflake Cortex LLM** (`SNOWFLAKE.CORTEX.AI_COMPLETE` & `SNOWFLAKE.CORTEX.AGENT_RUN`) with explicit reasoning explanations and Cortex Search RAG over official SOPs.
+- Grounded responses powered by **Snowflake Cortex LLM** with SOP Search RAG over official disaster guidelines.
 - Session transcript history stored in Snowflake `chat_history`.
 
-### 🗺️ 2. Dynamic GIS Disaster Map
+### 🗺️ 5. Dynamic GIS Disaster Map
 - Rendered using **MapLibre GL** with dark/light EOC theme options.
 - **Dynamic Risk Zone Polygons**: Computed dynamically on the backend ([`map.py`](backend/app/api/map.py)) based on active high-risk river sensors and barangay spatial coordinates.
-- Interactive map layers: Flood Risk Zones, Evacuation Centers (with capacity stats), Hospitals (with bed availability), and River Sensor Stations.
-- **Real-Time Telemetry Updates**: River sensor water levels stream live to the map via WebSockets.
+- Interactive map layers: Flood Risk Zones, Evacuation Centers, Hospitals, and River Sensor Stations with real-time WebSocket telemetry updates.
 
-### 📋 3. Recommendation & Directive Panel
-- **Alert Status & Confidence**: Real-time alert status badge (e.g. `Orange Alert`, `94% Confidence`).
-- **Impact Radius**: Displays total affected population and targeted barangays.
-- **Human-in-the-Loop Directive Approvals**: Interactive buttons allow commanders to review and approve specific AI directives (e.g., *"Deploy 8 rescue teams"*, *"Open City Coliseum"*).
-
-### 📡 4. Job Execution & Notification Console
-- Tracks multi-channel broadcast jobs (`SMS` and `Email`).
-- Live dispatch progress counters (e.g. `1,200 / 1,200 SMS (100%)`).
-- Real-time log streaming via WebSocket updates (`job_log_update`).
-- Controls for text resizing, log filtering (`SMS`/`Email`), and log copying.
-
-### 📜 5. Audit Timeline & Incident Reporting
-- Logs all AI risk assessments, human directive approvals, and broadcast job dispatches.
-- Automatically persisted to Snowflake `audit_logs`.
+### 📜 6. Audit Timeline & Incident Reporting
+- Persists all AI risk assessments, fast-path SOP executions, human directive approvals, and broadcast job dispatches to Snowflake `audit_logs`.
 - One-click **JSON Incident Report Exporter** for post-disaster agency debriefs.
-
-### 🔒 6. Security & Authentication Architecture
-- **Firebase Google OAuth 2.0 Integration**: Authenticates emergency response commanders using Firebase Google Auth popup (`signInWithPopup`).
-- **FastAPI Route Protection Dependency**: REST endpoints (e.g. `@router.post("/")` in [`backend/app/api/jobs.py`](backend/app/api/jobs.py)) enforce token verification via `get_current_user` dependency in [`backend/app/core/auth.py`](backend/app/core/auth.py).
-- **Public & Private Flow Isolation**: Unauthenticated visitors explore the landing page and EOC Workflow Simulator without triggering backend database queries or WebSocket connections. Authenticated commanders gain access to live telemetry, real-time map updates, and dispatch capabilities.
 
 ---
 
 ## 🎬 Operational Scenario Walkthrough
 
-1. **Typhoon Surge**: Severe precipitation triggers 175mm rainfall and river sensor `ZAM-TUMAGA-01` reaches **8.8m** (exceeding 8.0m Critical Threshold).
-2. **Operator Query**: Commander asks: *"Which areas are at greatest flood risk?"*
-3. **AI Reasoning**: Copilot identifies high-risk barangays (*Tumaga, Sta. Maria, Tetuan*), calculates 28,000 affected residents, and explains sensor threshold breach.
-4. **Action Directive**: Commander asks: *"What should we do?"* -> Copilot recommends an **Orange Alert**, deploying 8 rescue teams, 4 ambulances, and opening local shelters.
-5. **Human Approval & Execution**: Commander clicks **"Approve Directive"** -> The Job Execution Engine queues and dispatches SMS/Email alerts to affected residents, streaming live delivery logs to the console and recording audit trails in Snowflake.
+1. **Typhoon Surge**: Severe precipitation triggers 185mm rainfall and river sensor `ZAM-TUMAGA-01` reaches **8.5m** (exceeding 8.0m Critical Threshold).
+2. **Fast-Path Auto Trigger**: Sentinel AI automatically cites `SOP-FL-04 Section 3.2`, logs a `fast_path_execution` audit event, and dispatches public SMS/Email advisories and responder staging notifications.
+3. **Operator Overview**: Commander reviews the **Tiered Guardrail UI**:
+   - ⚡ **Fast-Path Section**: Shows public warnings and responder staging as `⚡ AUTO-EXECUTED & STAGED`.
+   - 🛡️ **Guardrailed Section**: Displays physical deployment directives (*"Deploy 6 Inflatable Rescue Boats to Sector 3"*).
+4. **Human Approval & Dispatch Execution**: Commander clicks **"Approve & Deploy"** -> The Job Execution Engine locks request idempotency, dispatches worker jobs with exponential backoff retries, and streams live delivery progress to the console.
 
 ---
 
@@ -191,10 +191,10 @@ SENTINEL_AI_DB.PUBLIC
 | **LLM & Search Platform** | **Snowflake Cortex** | `SNOWFLAKE.CORTEX.AI_COMPLETE`, `AGENT_RUN`, and Cortex Search for SOP RAG retrieval. |
 | **Data Platform** | **Snowflake DB** | Centralized operational telemetry, census data, spatial coordinates, and audit logs. |
 | **Backend API** | **FastAPI (Python 3.12)** | Asynchronous REST endpoints, WebSockets, Structlog, and Pydantic validation. |
-| **Background Processing** | **Celery & Redis** | Asynchronous weather ingestion worker tasks with idempotency & retry protection. |
+| **Background Processing** | **Celery & Redis** | Asynchronous weather ingestion worker tasks with fast-path triggers & retry protection. |
 | **Frontend UI** | **React.js (TypeScript)** | Modern EOC layout, Tailwind CSS design tokens, MapLibre GL, Recharts analytics. |
 | **Real-Time Streaming** | **WebSockets** | Live stream of river sensor updates and job dispatch execution logs. |
-| **Notification Engine** | **Job Execution Engine** | Multi-channel SMS (Twilio gateway mock) & Email (SMTP relay mock) task dispatcher. |
+| **Notification Engine** | **Job Execution Engine** | Multi-channel SMS & Email worker dispatcher with idempotency locks & exponential retries. |
 | **Authentication & Security** | **Firebase Auth & FastAPI Dependency** | Google OAuth 2.0 Sign-In, Firebase Bearer Token verification, and protected FastAPI endpoints. |
 
 ---
@@ -214,12 +214,12 @@ sentinel/
 │   ├── setup_3_cortex_search.sql # Step 3: SOP table & Cortex Search Service setup
 │   ├── setup_4_semantic_view.sql # Step 4: Semantic View DDL for Cortex Analyst Text-to-SQL
 │   ├── setup_5_cortex_agent.sql  # Step 5: Cortex Agent DDL with staged skills & tool specifications
-│   ├── pat_auth.sql          # Optional PAT authentication policy & token creation
+│   ├── pat_auth.sql          # Snowflake PAT authentication policy & token setup
 │   ├── select.sql            # Verification & validation SQL queries
 │   └── skills/               # Individual SKILL.md definition directories
 ├── backend/
 │   ├── pyproject.toml        # Python dependencies (managed via uv)
-│   ├── tests/                # Pytest suite
+│   ├── tests/                # Pytest suite (test_jobs, test_main, test_rate_limit)
 │   └── app/
 │       ├── main.py           # FastAPI application entrypoint
 │       ├── api/              # REST & WebSocket endpoints (copilot, map, jobs, audit, ingestion)
@@ -256,11 +256,11 @@ Execute the setup scripts in sequential order inside your **Snowflake Worksheets
 
 1. **Schema Setup**: Run [`snowflake/setup_1_schema.sql`](snowflake/setup_1_schema.sql) to initialize `SENTINEL_AI_DB` database, schema, and operational tables.
 2. **Seed Data**: Run [`snowflake/setup_2_seed.sql`](snowflake/setup_2_seed.sql) to populate initial telemetry, barangay census metrics, evacuation centers, and hospital beds.
-3. **PAT Authentication Setup**: Run [`snowflake/setup_3_pat_auth.sql`](snowflake/setup_3_pat_auth.sql) to configure authentication policy (`pat_auth_policy`) and generate Programmatic Access Tokens for Cortex CLI.
-4. **Cortex Search**: Run [`snowflake/setup_4_cortex_search.sql`](snowflake/setup_4_cortex_search.sql) to set up SOP reference tables and create `SENTINEL_SOP_SEARCH_SERVICE`.
-5. **Semantic View**: Run [`snowflake/setup_5_semantic_view.sql`](snowflake/setup_5_semantic_view.sql) to create `SENTINEL_SEMANTIC_VIEW` for Cortex Analyst Text-to-SQL querying.
-6. **Cortex Agent**: Run [`snowflake/setup_6_cortex_agent.sql`](snowflake/setup_6_cortex_agent.sql) to stage skills and create the `SentinelAI` Cortex Agent.
-7. **Verify Installation**: Run [`snowflake/setup_7_select.sql`](snowflake/setup_7_select.sql) to test telemetry, RAG search preview, and Cortex Agent execution.
+3. **PAT Authentication Setup**: Run [`snowflake/pat_auth.sql`](snowflake/pat_auth.sql) to configure authentication policy (`pat_auth_policy`) and generate Programmatic Access Tokens for Cortex CLI.
+4. **Cortex Search**: Run [`snowflake/setup_3_cortex_search.sql`](snowflake/setup_3_cortex_search.sql) to set up SOP reference tables and create `SENTINEL_SOP_SEARCH_SERVICE`.
+5. **Semantic View**: Run [`snowflake/setup_4_semantic_view.sql`](snowflake/setup_4_semantic_view.sql) to create `SENTINEL_SEMANTIC_VIEW` for Cortex Analyst Text-to-SQL querying.
+6. **Cortex Agent**: Run [`snowflake/setup_5_cortex_agent.sql`](snowflake/setup_5_cortex_agent.sql) to stage skills and create the `SentinelAI` Cortex Agent.
+7. **Verify Installation**: Run [`snowflake/select.sql`](snowflake/select.sql) to test telemetry, RAG search preview, and Cortex Agent execution.
 
 ---
 
