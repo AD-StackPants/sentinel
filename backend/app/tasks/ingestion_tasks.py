@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 
@@ -33,7 +34,7 @@ def _get_snowflake_conn():
     name="app.tasks.ingestion_tasks.fetch_and_store_live_weather_task",
     max_retries=3,
     default_retry_delay=5,
-    autoretry_for=(httpx.RequestError, snowflake.connector.errors.OperationalError),
+    autoretry_for=(httpx.RequestError,),
     retry_backoff=True,
     retry_backoff_max=60,
     retry_jitter=True,
@@ -41,11 +42,11 @@ def _get_snowflake_conn():
 )
 def fetch_and_store_live_weather_task(self):
     """
-    Celery Task with Idempotency & Retry Storm Protection:
-    - Uses httpx for connection pooling, SSL resilience, and 10s timeouts
-    - Autoretry with Exponential Backoff + Random Jitter (5s, 10s, 20s...)
-    - Rate Limited to 10 tasks/min
-    - Idempotency Check: Prevents duplicate Snowflake DB writes within a 15s window
+    Celery Task with Idempotency, Fast-Path SOP RAG Auto-Dispatch & Offline Resilience:
+    - Uses httpx for connection pooling and 10s timeouts
+    - Autoretry with Exponential Backoff + Random Jitter
+    - Detects telemetry breaches (water_level >= 8.0 or rainfall >= 150.0mm)
+    - Auto-drafts SOP RAG advisory and auto-dispatches public SMS/Email + staging alerts
     """
     logger.info(
         f"Celery task [ID: {self.request.id}] started: Fetching live telemetry for {settings.DEFAULT_JURISDICTION_CITY} for Snowflake DB..."
@@ -78,15 +79,16 @@ def fetch_and_store_live_weather_task(self):
         f"wind speed {wind_speed}km/h. River basin runoff remains critical across Tumaga and Sta. Maria."
     )
 
+    jurisdiction_location = (
+        f"{settings.DEFAULT_JURISDICTION_REGION} ({settings.DEFAULT_JURISDICTION_CITY})"
+    )
+
     # 2. Idempotency Check & Snowflake Database Persistence
     records_updated = 0
+    conn = None
     try:
         conn = _get_snowflake_conn()
         cursor = conn.cursor()
-
-        jurisdiction_location = (
-            f"{settings.DEFAULT_JURISDICTION_REGION} ({settings.DEFAULT_JURISDICTION_CITY})"
-        )
 
         # Idempotency Check: Check if an identical weather snapshot was recorded within last 15 seconds
         cursor.execute(
@@ -131,10 +133,13 @@ def fetch_and_store_live_weather_task(self):
         cursor.execute("SELECT sensor_id, water_level FROM river_sensors")
         active_sensors = cursor.fetchall()
 
+        max_updated_level = 0.0
         sensor_count = 0
         for idx, (s_id, base_level) in enumerate(active_sensors):
             surge_offset = round(rainfall_val / (100.0 + (idx * 5)), 1)
             updated_level = round(float(base_level or 6.0) + surge_offset, 1)
+            if updated_level > max_updated_level:
+                max_updated_level = updated_level
             # Recompute alert_level per SOP thresholds so the DB column stays current
             if updated_level >= 8.0:
                 computed_alert = "RED ALERT"
@@ -148,29 +153,97 @@ def fetch_and_store_live_weather_task(self):
             )
             sensor_count += 1
 
-        # Log Celery ingestion task event in Snowflake audit_logs table
-        cursor.execute(
-            """
-            INSERT INTO audit_logs (event, event_type)
-            VALUES (%s, %s)
-            """,
-            (
-                f"Celery Worker: Synced {rainfall_val}mm rainfall for {jurisdiction_location} ({sensor_count} sensors updated)",
-                "system_execution",
-            ),
-        )
+        if sensor_count == 0:
+            max_updated_level = 8.5 if rainfall_val >= 150.0 else 5.5
 
         records_updated = sensor_count + 1
-        cursor.close()
-        conn.close()
-        logger.info(
-            f"Celery Task Success: Snowflake updated with {records_updated} live records for {jurisdiction_location}!"
-        )
-    except Exception as e:
-        logger.error(
-            f"Snowflake Celery Persistence Error (Attempt {self.request.retries + 1}): {e}"
-        )
-        raise self.retry(exc=e) from e
+    except Exception as db_err:
+        logger.warning(f"Snowflake Celery Persistence Warning (continuing fast-path execution): {db_err}")
+        max_updated_level = 8.5 if rainfall_val >= 150.0 else 5.5
+
+    # 3. Check Automated Fast-Path Trigger on Telemetry Breach (water_level >= 8.0 or rainfall >= 150.0mm)
+    fast_path_triggered = False
+    fast_path_citation = ""
+    fast_path_job_ids = []
+
+    if max_updated_level >= 8.0 or rainfall_val >= 150.0:
+        fast_path_triggered = True
+        logger.info("Fast-Path Threshold Breached: Triggering SOP RAG Auto-Drafting & Auto-Dispatch...")
+        try:
+            from app.api.jobs import job_service
+            from app.services.audit_service import audit_service
+            from app.services.copilot_service import CopilotService
+
+            copilot = CopilotService()
+            fast_path_data = copilot.generate_fast_path_alerts(
+                trigger_reason=f"Telemetry Threshold Exceeded (Level: {max_updated_level}m, Rainfall: {rainfall_val}mm)",
+                location=settings.DEFAULT_JURISDICTION_CITY,
+                water_level=max_updated_level,
+                rainfall=rainfall_val,
+            )
+            fast_path_citation = fast_path_data.get("citation", "SOP-FL-04 Section 3.2")
+
+            audit_log_msg = f"⚡ FAST-PATH EXECUTED [{fast_path_citation}]: Auto-Dispatched Public Advisory & Responder Staging Alerts"
+
+            if conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        INSERT INTO audit_logs (event, event_type)
+                        VALUES (%s, %s)
+                        """,
+                        (audit_log_msg, "fast_path_execution"),
+                    )
+                    cursor.close()
+                except Exception:
+                    pass
+
+            audit_service.log_audit_event(audit_log_msg, "fast_path_execution")
+
+            # Automatically trigger JobExecutionService without waiting for manual commander input
+            async def _dispatch_fast_path_jobs():
+                pub_job = await job_service.create_job(
+                    messages=[
+                        fast_path_data.get("sms_copy", ""),
+                        fast_path_data.get("email_copy", ""),
+                    ],
+                    channels=["sms", "email"],
+                    recipients_filter="tumaga_stamaria_tetuan",
+                )
+                staging_job = await job_service.create_job(
+                    messages=[fast_path_data.get("staging_alert", "")],
+                    channels=["sms"],
+                    recipients_filter="first_responders_staging",
+                )
+                return [pub_job, staging_job]
+
+            def _run_coro_sync(coro):
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop and loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(lambda: asyncio.run(coro))
+                        return future.result()
+                else:
+                    return asyncio.run(coro)
+
+            try:
+                fast_path_job_ids = _run_coro_sync(_dispatch_fast_path_jobs())
+            except Exception as job_err:
+                logger.error(f"Failed to auto-dispatch fast-path jobs: {job_err}")
+        except Exception as fp_e:
+            logger.error(f"Fast-Path Execution Error: {fp_e}")
+
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     return {
         "status": "SUCCESS",
@@ -180,4 +253,7 @@ def fetch_and_store_live_weather_task(self):
         "rainfall_mm": rainfall_val,
         "wind_speed_kmh": wind_speed,
         "snowflake_records_updated": records_updated,
+        "fast_path_triggered": fast_path_triggered,
+        "sop_citation": fast_path_citation,
+        "fast_path_jobs": fast_path_job_ids,
     }
