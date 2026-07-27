@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
-from app.core.config import settings
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.services.telemetry_service import telemetry_service
 
 
@@ -24,10 +25,21 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Inner security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate limiting
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=20,     # Max 20 requests
+    window_seconds=300,  # Per 5-minute interval
+)
+
+# CORSMiddleware MUST be added LAST to ensure it wraps ALL responses (including 429 & 404 errors) with CORS headers
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,6 +47,6 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/health")
+@app.get("/healthz")
 def health_check():
     return {"status": "ok", "message": "Sentinel AI Backend is running."}
