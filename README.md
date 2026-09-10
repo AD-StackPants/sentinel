@@ -2,6 +2,21 @@
 
 > **An AI-powered Emergency Operations Copilot built with Snowflake CoCo CLI that assists disaster response agencies in assessing risks, recommending actionable directives, and reliably notifying affected communities through an audited Job Execution Engine.**
 
+[![Snowflake CoCo CLI](https://img.shields.io/badge/Snowflake-CoCo%20CLI-29B5E8?style=flat&logo=snowflake&logoColor=white)](https://snowflake.com)
+[![Snowflake Cortex](https://img.shields.io/badge/Snowflake-Cortex%20AI-29B5E8?style=flat&logo=snowflake&logoColor=white)](https://snowflake.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Celery](https://img.shields.io/badge/Celery-37814A?style=flat&logo=celery&logoColor=white)](https://docs.celeryq.dev)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io)
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![MapLibre GL](https://img.shields.io/badge/MapLibre_GL-396EC2?style=flat&logo=maplibre&logoColor=white)](https://maplibre.org)
+
+[![Competed in - Snowflake CoCo CLI Hackathon 2026](https://img.shields.io/badge/Competed%20in-Snowflake%20CoCo%20CLI%20Hackathon%202026-29B5E8?style=for-the-badge&logo=gnubash&logoColor=white)](#)
+[![Competed in - Gen AI Academy APAC Edition](https://img.shields.io/badge/Competed%20in-Gen%20AI%20Academy%20APAC%20Edition-4285F4?style=for-the-badge&logo=gnubash&logoColor=white)](#)
+
 ---
 
 ## 📖 Overview
