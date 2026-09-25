@@ -3,52 +3,122 @@
 
 @import "@ad-technology-inc/design-system/app.css";
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN SYSTEM TOKEN OVERRIDES
+   Remaps @ad-technology-inc/design-system variables to the slate palette
+   specified in .agents/skills/ui-design/references/design-system-tokens.md
+   Primary: #1976D2 | Dark mode: slate-900/slate-950 | Semantic: emerald/amber/rose
+───────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Canvas & surfaces */
+    --background: #F8FAFC;        /* slate-50  */
+    --card:       #FFFFFF;        /* white     */
+
+    /* Borders */
+    --border:     #E2E8F0;        /* slate-200 */
+
+    /* Typography */
+    --foreground:          #0F172A;  /* slate-900 */
+    --neutral-foreground:  #64748B;  /* slate-500 */
+
+    /* Brand — #1976D2 primary blue */
+    --primary:            #1976D2;
+    --primary-hover:      #1565C0;
+    --primary-foreground: #FFFFFF;
+    --secondary:          #F1F5F9;  /* slate-100 */
+    --secondary-hover:    #E2E8F0;  /* slate-200 */
+    --secondary-foreground: #334155; /* slate-700 */
+
+    /* Semantic feedback — emerald / amber / rose */
+    --success:            #059669;  /* emerald-600 */
+    --success-foreground: #ECFDF5;  /* emerald-50  */
+    --warning:            #D97706;  /* amber-600   */
+    --warning-foreground: #FFFBEB;  /* amber-50    */
+    --danger:             #DC2626;  /* rose-600    */
+    --danger-foreground:  #FFF1F2;  /* rose-50     */
+    --info:               #1976D2;
+    --info-foreground:    #FFFFFF;
+
+    /* Accent (repurpose to blue tint) */
+    --accent:             #EFF6FF;  /* blue-50  */
+    --accent-foreground:  #1976D2;  /* #1976D2  */
+
+    /* Neutral */
+    --neutral:            #F8FAFC;  /* slate-50  */
+    --neutral-hover:      #F1F5F9;  /* slate-100 */
+
+    /* Radius */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Canvas & surfaces — deep slate, never pure black */
+    --background: #020617;        /* slate-950 */
+    --card:       #0F172A;        /* slate-900 */
+
+    /* Borders */
+    --border:     #1E293B;        /* slate-800 */
+
+    /* Typography */
+    --foreground:         #F8FAFC;  /* slate-50  */
+    --neutral-foreground: #94A3B8;  /* slate-400 */
+
+    /* Brand — keep same blue in dark */
+    --primary:            #1976D2;
+    --primary-hover:      #1565C0;
+    --primary-foreground: #FFFFFF;
+    --secondary:          #1E293B;  /* slate-800 */
+    --secondary-hover:    #334155;  /* slate-700 */
+    --secondary-foreground: #E2E8F0; /* slate-200 */
+
+    /* Semantic feedback */
+    --success:            #34D399;  /* emerald-400 */
+    --success-foreground: #022C22;
+    --warning:            #FCD34D;  /* amber-300   */
+    --warning-foreground: #1C1400;
+    --danger:             #F87171;  /* rose-400    */
+    --danger-foreground:  #1F0000;
+    --info:               #60A5FA;  /* blue-400    */
+    --info-foreground:    #0A0F1E;
+
+    /* Accent */
+    --accent:             #172554;  /* blue-950/60 */
+    --accent-foreground:  #93C5FD;  /* blue-300    */
+
+    /* Neutral */
+    --neutral:            #0F172A;  /* slate-900 */
+    --neutral-hover:      #1E293B;  /* slate-800 */
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BASE STYLES
+───────────────────────────────────────────────────────────────────────────── */
 @layer base {
   html, body, #root {
     height: 100%;
     margin: 0;
     padding: 0;
-    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Custom Scrollbars for EOC Panels */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-}
-.dark ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 9999px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
+/* ─────────────────────────────────────────────────────────────────────────────
+   CUSTOM SCROLLBARS
+───────────────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.25); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.45); }
 
-/* Glassmorphism & Micro-animations */
+.dark ::-webkit-scrollbar-thumb       { background: rgba(148, 163, 184, 0.15); border-radius: 9999px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.3); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   UTILITIES
+───────────────────────────────────────────────────────────────────────────── */
 .glass-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.05); }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
